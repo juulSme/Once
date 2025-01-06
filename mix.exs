@@ -1,4 +1,4 @@
-defmodule NoNoncenseId.MixProject do
+defmodule NoNoncenseID.MixProject do
   use Mix.Project
 
   def project do

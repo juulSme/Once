@@ -1,4 +1,4 @@
-defmodule NoNoncenseIdTest do
+defmodule NoNoncenseIDTest do
   use ExUnit.Case
-  doctest NoNoncenseId
+  doctest NoNoncenseID
 end

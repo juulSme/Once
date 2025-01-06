@@ -1,5 +1,5 @@
-defmodule NoNoncenseId do
+defmodule NoNoncenseID do
   @moduledoc """
-  Documentation for `NoNoncenseId`.
+  Documentation for `NoNoncenseID`.
   """
 end
