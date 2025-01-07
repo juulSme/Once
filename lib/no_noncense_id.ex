@@ -68,9 +68,6 @@ defmodule NoNoncenseID do
   ## Encrypted IDs
 
   By default, IDs are generated using a machine init timestamp, machine ID and counter (although they should be considered to be opague). This means they leak a little information and are somewhat predictable. If you don't like that, you can use encrypted IDs by passing options `encrypt?: true` and `get_key: fn -> <<_::192>> end`. Note that encrypted IDs will cost you the data locality and decrease index performance a little. The encryption algorithm is 3DES and that can't be changed. If you want to know why, take a look at [NoNoncense](https://hexdocs.pm/no_noncense/NoNoncense.html#module-encrypted-nonces).
-
-
-
   """
   use Ecto.ParameterizedType
 
