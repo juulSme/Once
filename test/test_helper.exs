@@ -4,4 +4,4 @@ ExUnit.start()
 Ecto.Adapters.SQL.Sandbox.mode(MyApp.PgRepo, :manual)
 Ecto.Adapters.SQL.Sandbox.mode(MyApp.MysqlRepo, :manual)
 
-NoNoncense.init(name: NoNoncenseID, machine_id: 0)
+NoNoncense.init(name: Once, machine_id: 0)

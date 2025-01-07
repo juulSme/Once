@@ -1,4 +1,4 @@
-defmodule TestNoNoncenseID.DataCase do
+defmodule TestOnce.DataCase do
   use ExUnit.CaseTemplate
 
   using do
@@ -8,7 +8,7 @@ defmodule TestNoNoncenseID.DataCase do
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
-      import TestNoNoncenseID.DataCase
+      import TestOnce.DataCase
     end
   end
 
