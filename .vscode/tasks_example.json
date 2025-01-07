@@ -12,6 +12,7 @@
     },
     {
       "label": "Test",
+      "dependsOn": ["(Docker) Start dbs"],
       "type": "shell",
       "command": "mix test",
       "group": {
@@ -21,6 +22,7 @@
     },
     {
       "label": "Test watch",
+      "dependsOn": ["(Docker) Start dbs"],
       "type": "shell",
       "command": "mix test.watch",
       "group": "test"
@@ -37,6 +39,7 @@
     },
     {
       "label": "Test file",
+      "dependsOn": ["(Docker) Start dbs"],
       "type": "shell",
       "command": "mix test ${relativeFile}",
       "group": "test",
@@ -46,12 +49,19 @@
     },
     {
       "label": "Test line",
+      "dependsOn": ["(Docker) Start dbs"],
       "type": "shell",
       "command": "mix test ${relativeFile}:${lineNumber}",
       "group": "test",
       "runOptions": {
         "reevaluateOnRerun": false
       }
+    },
+    {
+      "label": "(Docker) Start dbs",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "up", "-d"]
     }
   ]
 }

@@ -4,17 +4,16 @@
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `no_noncense_id` to your list of dependencies in `mix.exs`:
+The package is hosted on [hex.pm](https://hex.pm/packages/no_noncense_id) and can be installed by adding `:no_noncense_id` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:no_noncense_id, "~> 0.1.0"}
+    {:no_noncense_id, "~> 0.0.1"}
   ]
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/no_noncense_id>.
+## Docs
+
+Documentation can be found on [hexdocs.pm](https://hexdocs.pm/no_noncense_id/).

@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: supersecret
+      POSTGRES_DB: no_noncense
+
+  mysql:
+    image: mysql:debian
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: supersecret
+      MYSQL_DATABASE: no_noncense
