@@ -61,6 +61,10 @@ defmodule Once do
 
   If you don't like the formats, it's really easy to change them! The Elixir format especially, which can be changed at any time. Be mindful of JSON limitations if you use integers.
 
+  The supported formats are:
+
+  #{@format_docs}
+
   ## On "global" uniqueness
 
   By "global", we mean within your domain. UUIDs are truly unique across domains, servers and applications. A Once is not, because 64 bits is not enough to achieve that. However, they are unique within your application, across tables and entities. With 64 bits, you can generate 8 million IDs per second on 512 machines in parallel for 140 years straight before you run out of bits, by which time your grandchildren will deal with the problem.
