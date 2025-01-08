@@ -182,23 +182,23 @@ defmodule Once do
   @spec to_format(binary() | integer(), format()) :: {:ok, binary() | integer()} | :error
   def to_format(value, format)
   # to :encoded
-  def to_format(encoded = <<_::bits-88>>, :encoded), do: {:ok, encoded}
-  def to_format(raw = <<_::bits-64>>, :encoded), do: encode(raw)
+  def to_format(encoded = <<_::88>>, :encoded), do: {:ok, encoded}
+  def to_format(raw = <<_::64>>, :encoded), do: encode(raw)
 
   def to_format(int, :encoded) when is_integer(int) do
     convert_int(int, :signed) |> if_ok(&encode(<<&1::signed-64>>))
   end
 
   # to :raw
-  def to_format(encoded = <<_::bits-88>>, :raw), do: decode(encoded)
-  def to_format(raw = <<_::bits-64>>, :raw), do: {:ok, raw}
+  def to_format(encoded = <<_::88>>, :raw), do: decode(encoded)
+  def to_format(raw = <<_::64>>, :raw), do: {:ok, raw}
 
   def to_format(int, :raw) when is_integer(int) do
     convert_int(int, :signed) |> if_ok(&{:ok, <<&1::signed-64>>})
   end
 
   # to :signed / :unsigned
-  def to_format(encoded = <<_::bits-88>>, int_format) when int_format in @int_formats do
+  def to_format(encoded = <<_::88>>, int_format) when int_format in @int_formats do
     decode(encoded) |> if_ok(&to_format(&1, int_format))
   end
 
