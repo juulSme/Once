@@ -69,7 +69,7 @@ defmodule Once do
 
   ## On local uniqueness
 
-  By locally unique, we mean unique within your domain or application. UUIDs are globally unique across domains, servers and applications. A Once is not, because 64 bits is not enough to achieve that. It is enough for local uniqueness however: you can generate 8 million IDs per second on 512 machines in parallel for 140 years straight before you run out of bits, by which time your grand-grandchildren will deal with the problem. Even higher burst rates are possible and you can use separate `NoNoncense` instanses for every table if you wish.
+  By locally unique, we mean unique within your domain or application. UUIDs are globally unique across domains, servers and applications. A Once is not, because 64 bits is not enough to achieve that. It is enough for local uniqueness however: you can generate 8 million IDs per second on 512 machines in parallel for 140 years straight before you run out of bits, by which time your great-grandchildren will deal with the problem. Even higher burst rates are possible and you can use separate `NoNoncense` instanses for every table if you wish.
 
   ## Encrypted IDs
 
