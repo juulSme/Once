@@ -8,7 +8,7 @@ defmodule MyApp.Schema do
     field :bigint_id, Once
 
     field :bin_id, Once, db_format: :raw
-    field :string_id, Once, db_format: :encoded
+    field :string_id, Once, db_format: :url64
 
     # mysql-only
     field :unsigned_id, Once, db_format: :unsigned, load_in_query: false

@@ -1,13 +1,14 @@
 defmodule Once do
   @format_docs """
-  - `:encoded` a url64-encoded string of 11 characters, for example `"AAjhfZyAAAE"`
+  - `:url64` a url64-encoded string of 11 characters, for example `"AAjhfZyAAAE"`
+  - `:hex` a hex-encoded string of 16 characters, for example `"E010831058218A39"`
   - `:raw` a bitstring of 64 bits, for example `<<0, 8, 225, 125, 156, 128, 0, 2>>`
   - `:signed` a signed 64-bits integer, like `-12345`, between -(2^63) and 2^63-1
   - `:unsigned` an unsigned 64-bits integer, like `67890`, between 0 and 2^64-1
   """
   @options_docs """
   - `:no_noncense` name of the NoNoncense instance used to generate new IDs (default `Once`)
-  - `:ex_format` what an ID looks like in Elixir, one of `t:format/0` (default `:encoded`)
+  - `:ex_format` what an ID looks like in Elixir, one of `t:format/0` (default `:url64`)
   - `:db_format` what an ID looks like in your database, one of `t:format/0` (default `:signed`)
   - `:encrypt?` enable for encrypted nonces (default `false`)
   - `:get_key` a zero-arity getter for the 192-bits encryption key, required if encryption is enabled
@@ -54,8 +55,9 @@ defmodule Once do
       <<255, 255, 255, 255, 255, 255, 255, 255>>
       "__________8"
       18_446_744_073_709_551_615
+      "FFFFFFFFFFFFFFFF"
 
-  If you use the defaults `:encoded` as the Elixir format and `:signed` in your database, you could see `"AAAAAACYloA"` in Elixir and `10_000_000` in your database. The reasoning behind these defaults is that the encoded format is readable, short, and JSON safe by default, while the signed format means you can use a standard bigint column type.
+  If you use the defaults `:url64` as the Elixir format and `:signed` in your database, you could see `"AAAAAACYloA"` in Elixir and `10_000_000` in your database. The reasoning behind these defaults is that the encoded format is readable, short, and JSON safe by default, while the signed format means you can use a standard bigint column type.
 
   The negative integers will not cause problems with Postgres and MySQL, they both happily swallow them. Also, negative integers will only start to appear after ~70 years of usage.
 
@@ -81,7 +83,7 @@ defmodule Once do
 
   #{@format_docs}
   """
-  @type format :: :encoded | :raw | :signed | :unsigned
+  @type format :: :url64 | :raw | :signed | :unsigned | :hex
 
   @typedoc """
   Options to initialize `Once`.
@@ -99,11 +101,12 @@ defmodule Once do
   @default_opts %{
     no_noncense: __MODULE__,
     encrypt?: false,
-    ex_format: :encoded,
+    ex_format: :url64,
     db_format: :signed
   }
 
   @int_formats [:signed, :unsigned]
+  @encoded_formats [:url64, :hex]
 
   #######################
   # Type implementation #
@@ -111,8 +114,8 @@ defmodule Once do
 
   @impl true
   def type(%{ex_format: :raw}), do: :binary
-  def type(%{ex_format: :encoded}), do: :string
-  def type(%{ex_format: int}) when int in @int_formats, do: :integer
+  def type(%{ex_format: format}) when format in @encoded_formats, do: :string
+  def type(%{ex_format: format}) when format in @int_formats, do: :integer
 
   @impl true
   @spec init(opts()) :: map()
@@ -164,60 +167,36 @@ defmodule Once do
       {:ok, -2301195303365014983}
       iex> Once.to_format(-2301195303365014983, :unsigned)
       {:ok, 16145548770344536633}
-      iex> Once.to_format(16145548770344536633, :encoded)
+      iex> Once.to_format(16145548770344536633, :hex)
+      {:ok, "E010831058218A39"}
+      iex> Once.to_format("E010831058218a39", :url64)
       {:ok, "4BCDEFghijk"}
 
-      iex> Once.to_format(-1, :encoded)
+      iex> Once.to_format(-1, :url64)
       {:ok, "__________8"}
       iex> Once.to_format("__________8", :raw)
       {:ok, <<255, 255, 255, 255, 255, 255, 255, 255>>}
       iex> Once.to_format(<<255, 255, 255, 255, 255, 255, 255, 255>>, :unsigned)
       {:ok, 18446744073709551615}
-      iex> Once.to_format(18446744073709551615, :signed)
+      iex> Once.to_format(18446744073709551615, :hex)
+      {:ok, "FFFFFFFFFFFFFFFF"}
+      iex> Once.to_format("FFFFFFFFFFFFFFFF", :signed)
       {:ok, -1}
 
       iex> Once.to_format(Integer.pow(2, 64), :unsigned)
       :error
   """
   @spec to_format(binary() | integer(), format()) :: {:ok, binary() | integer()} | :error
-  def to_format(value, format)
-  # to :encoded
-  def to_format(encoded = <<_::88>>, :encoded), do: {:ok, encoded}
-  def to_format(raw = <<_::64>>, :encoded), do: encode(raw)
-
-  def to_format(int, :encoded) when is_integer(int) do
-    convert_int(int, :signed) |> if_ok(&encode(<<&1::signed-64>>))
-  end
-
-  # to :raw
-  def to_format(encoded = <<_::88>>, :raw), do: decode(encoded)
-  def to_format(raw = <<_::64>>, :raw), do: {:ok, raw}
-
-  def to_format(int, :raw) when is_integer(int) do
-    convert_int(int, :signed) |> if_ok(&{:ok, <<&1::signed-64>>})
-  end
-
-  # to :signed / :unsigned
-  def to_format(encoded = <<_::88>>, int_format) when int_format in @int_formats do
-    decode(encoded) |> if_ok(&to_format(&1, int_format))
-  end
-
-  def to_format(_raw = <<int::signed-64>>, :signed), do: {:ok, int}
-  def to_format(_raw = <<int::unsigned-64>>, :unsigned), do: {:ok, int}
-
-  def to_format(int, int_format) when is_integer(int) and int_format in @int_formats do
-    convert_int(int, int_format)
-  end
-
-  def to_format(_, _), do: :error
+  def to_format(value, format), do: identify_format(value) |> maybe_convert(value, format)
 
   @doc """
   Same as `to_format/2` but raises on error.
 
       iex> -200
-      ...> |> Once.to_format!(:encoded)
+      ...> |> Once.to_format!(:url64)
       ...> |> Once.to_format!(:raw)
       ...> |> Once.to_format!(:unsigned)
+      ...> |> Once.to_format!(:hex)
       ...> |> Once.to_format!(:signed)
       -200
 
@@ -241,6 +220,7 @@ defmodule Once do
   @signed_max Integer.pow(2, 63) - 1
   @unsigned_max @range - 1
 
+  # convert a signed to unsigned int and back
   defp convert_int(int, format)
   defp convert_int(int, _) when int < @signed_min, do: :error
   defp convert_int(int, _) when int > @unsigned_max, do: :error
@@ -250,9 +230,68 @@ defmodule Once do
 
   defp convert_int(int, _), do: {:ok, int}
 
-  defp if_ok({:ok, value}, then), do: then.(value)
-  defp if_ok(other, _), do: other
+  # paddingless url64 en/decoding
+  defp encode64(value), do: {:ok, Base.url_encode64(value, padding: false)}
+  defp decode64(value), do: Base.url_decode64(value, padding: false)
 
-  defp encode(value), do: {:ok, Base.url_encode64(value, padding: false)}
-  defp decode(value), do: Base.url_decode64(value, padding: false)
+  # hex en/decoding
+  defp encode16(value), do: {:ok, Base.encode16(value)}
+  defp decode16(value), do: Base.decode16(value, case: :mixed)
+
+  # identify the value's format, where ints are grouped together for convert_int/2 to deal with
+  defp identify_format(value)
+  defp identify_format(<<_::88>>), do: :url64
+  defp identify_format(<<_::64>>), do: :raw
+  defp identify_format(<<_::128>>), do: :hex
+  defp identify_format(int) when is_integer(int), do: :int
+  defp identify_format(_), do: :error
+
+  # convert (or verify) a value from one format to another
+  defp maybe_convert(format_in, value, format_out)
+  defp maybe_convert(:raw, value, :raw), do: {:ok, value}
+
+  defp maybe_convert(:url64, value, :url64) do
+    # we must check that the encoding is valid
+    case decode64(value) do
+      {:ok, _} -> {:ok, value}
+      _ -> :error
+    end
+  end
+
+  defp maybe_convert(:hex, value, :hex) do
+    case decode16(value) do
+      {:ok, _} -> {:ok, value}
+      _ -> :error
+    end
+  end
+
+  defp maybe_convert(:int, value, int_format) when int_format in @int_formats,
+    do: convert_int(value, int_format)
+
+  defp maybe_convert(format_in, value, format_out),
+    do: value |> to_raw(format_in) |> from_raw(format_out)
+
+  # convert a value to raw format
+  defp to_raw(value, from_format)
+  defp to_raw(value, :raw), do: {:ok, value}
+  defp to_raw(value, :url64), do: decode64(value)
+  defp to_raw(value, :hex), do: decode16(value)
+
+  defp to_raw(value, :int) do
+    case convert_int(value, :signed) do
+      {:ok, int} -> {:ok, <<int::signed-64>>}
+      _ -> :error
+    end
+  end
+
+  defp to_raw(_, :error), do: :error
+
+  # convert a raw value to another format
+  defp from_raw(raw, to_format)
+  defp from_raw({:ok, raw}, :raw), do: {:ok, raw}
+  defp from_raw({:ok, raw}, :url64), do: encode64(raw)
+  defp from_raw({:ok, raw}, :hex), do: encode16(raw)
+  defp from_raw({:ok, <<int::signed-64>>}, :signed), do: {:ok, int}
+  defp from_raw({:ok, <<int::unsigned-64>>}, :unsigned), do: {:ok, int}
+  defp from_raw(_, _), do: :error
 end

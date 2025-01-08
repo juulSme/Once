@@ -9,34 +9,74 @@ defmodule OnceUnitTest do
 
   describe "to_format/2" do
     @format_tests [
-      %{encoded: "AAAAAAAAAAA", raw: <<0, 0, 0, 0, 0, 0, 0, 0>>, signed: 0, unsigned: 0},
       %{
-        encoded: "__________8",
+        url64: "AAAAAAAAAAA",
+        raw: <<0, 0, 0, 0, 0, 0, 0, 0>>,
+        signed: 0,
+        unsigned: 0,
+        hex: "0000000000000000"
+      },
+      %{
+        url64: "__________8",
         raw: <<255, 255, 255, 255, 255, 255, 255, 255>>,
         signed: -1,
-        unsigned: @unsigned_max
+        unsigned: @unsigned_max,
+        hex: "FFFFFFFFFFFFFFFF"
       },
       %{
-        encoded: "f_________8",
+        url64: "f_________8",
         raw: <<127, 255, 255, 255, 255, 255, 255, 255>>,
         signed: @signed_max,
-        unsigned: @signed_max
+        unsigned: @signed_max,
+        hex: "7FFFFFFFFFFFFFFF"
       },
       %{
-        encoded: "gAAAAAAAAAA",
+        url64: "gAAAAAAAAAA",
         raw: <<128, 0, 0, 0, 0, 0, 0, 0>>,
         signed: @signed_min,
-        unsigned: @signed_max + 1
+        unsigned: @signed_max + 1,
+        hex: "8000000000000000"
       },
-      # out of bounds
-      %{invalid: @range, encoded: :error, raw: :error, signed: :error, unsigned: :error},
-      %{invalid: @signed_min - 1, encoded: :error, raw: :error, signed: :error, unsigned: :error}
+      # invalid inputs
+      %{
+        invalid: @range,
+        url64: :error,
+        raw: :error,
+        signed: :error,
+        unsigned: :error,
+        hex: :error
+      },
+      %{
+        invalid: @signed_min - 1,
+        url64: :error,
+        raw: :error,
+        signed: :error,
+        unsigned: :error,
+        hex: :error
+      },
+      %{invalid: "a", url64: :error, raw: :error, signed: :error, unsigned: :error, hex: :error},
+      %{
+        invalid: "++++++++++A",
+        url64: :error,
+        raw: :error,
+        signed: :error,
+        unsigned: :error,
+        hex: :error
+      },
+      %{
+        invalid: "XX12121212121212",
+        url64: :error,
+        raw: :error,
+        signed: :error,
+        unsigned: :error,
+        hex: :error
+      }
     ]
 
     for formats_values <- @format_tests,
         {format_in, input} <- formats_values,
         {format_out, output} <- formats_values,
-        input != :error and format_in != :invalid do
+        input != :error and not (format_in == :invalid and format_out == :invalid) do
       test "should map [#{format_in}: #{inspect(input)}] to [#{format_out}: #{inspect(output)}]" do
         case Once.to_format(unquote(input), unquote(format_out)) do
           {:ok, result} -> result
@@ -58,14 +98,14 @@ defmodule OnceUnitTest do
       assert %{
                db_format: :signed,
                encrypt?: false,
-               ex_format: :encoded,
+               ex_format: :url64,
                no_noncense: Once
              } == Once.init()
     end
 
     test "overrides defaults" do
-      assert %{db_format: :encoded, ex_format: :signed} =
-               Once.init(db_format: :encoded, ex_format: :signed)
+      assert %{db_format: :url64, ex_format: :signed} =
+               Once.init(db_format: :url64, ex_format: :signed)
     end
   end
 
@@ -80,7 +120,7 @@ defmodule OnceUnitTest do
       params = %{encrypt?: false, no_noncense: Once}
 
       assert <<_::64>> = Map.put(params, :ex_format, :raw) |> Once.autogenerate()
-      assert <<_::88>> = Map.put(params, :ex_format, :encoded) |> Once.autogenerate()
+      assert <<_::88>> = Map.put(params, :ex_format, :url64) |> Once.autogenerate()
       int = Map.put(params, :ex_format, :signed) |> Once.autogenerate()
       assert is_integer(int)
     end
@@ -101,7 +141,7 @@ defmodule OnceUnitTest do
       }
 
       assert <<_::64>> = Map.put(params, :ex_format, :raw) |> Once.autogenerate()
-      assert <<_::88>> = Map.put(params, :ex_format, :encoded) |> Once.autogenerate()
+      assert <<_::88>> = Map.put(params, :ex_format, :url64) |> Once.autogenerate()
       int = Map.put(params, :ex_format, :signed) |> Once.autogenerate()
       assert is_integer(int)
     end
