@@ -137,20 +137,7 @@ defmodule Once do
     opts
     |> Map.new()
     |> Enum.into(@default_opts)
-    |> case do
-      params = %{type: :encrypted, get_key: _} ->
-        params
-
-      %{type: :encrypted} ->
-        raise ArgumentError, "you must provide :get_key"
-
-      params = %{encrypt?: true} ->
-        Logger.warning("option `:encrypt?` is deprecated, use `type: :encrypted` instead")
-        params |> Map.put(:type, :encrypted) |> Keyword.new() |> init()
-
-      params ->
-        params
-    end
+    |> check_type_option()
   end
 
   @impl true
@@ -320,4 +307,16 @@ defmodule Once do
   defp from_raw({:ok, <<int::signed-64>>}, :signed), do: {:ok, int}
   defp from_raw({:ok, <<int::unsigned-64>>}, :unsigned), do: {:ok, int}
   defp from_raw(_, _), do: :error
+
+  defp check_type_option(params = %{type: :encrypted, get_key: _}), do: params
+
+  defp check_type_option(%{type: :encrypted}),
+    do: raise(ArgumentError, "you must provide :get_key")
+
+  defp check_type_option(params = %{encrypt?: true}) do
+    Logger.warning("option `:encrypt?` is deprecated, use `type: :encrypted` instead")
+    params |> Map.put(:type, :encrypted) |> check_type_option()
+  end
+
+  defp check_type_option(params), do: params
 end
