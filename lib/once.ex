@@ -127,9 +127,9 @@ defmodule Once do
   #######################
 
   @impl true
-  def type(%{ex_format: :raw}), do: :binary
-  def type(%{ex_format: format}) when format in @encoded_formats, do: :string
-  def type(%{ex_format: format}) when format in @int_formats, do: :integer
+  def type(%{db_format: :raw}), do: :binary
+  def type(%{db_format: format}) when format in @encoded_formats, do: :string
+  def type(%{db_format: format}) when format in @int_formats, do: :integer
 
   @impl true
   @spec init(opts()) :: map()
