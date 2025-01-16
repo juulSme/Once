@@ -13,6 +13,24 @@ defmodule Once do
   - `:nonce_type` how the nonce is generated, one of `t:nonce_type/0` (default `:counter`)
   - `:get_key` a zero-arity getter for the 192-bits encryption key, required if encryption is enabled
   - `:encrypt?` **deprecated**, use `type: :encrypted` (default `false`).
+
+  ## Integer format caveats
+
+  > #### Don't use raw integers with JS clients {: .warning}
+  >
+  > Stringify int-format Once's.
+
+  While JSON does not impose a precision limit on numbers, JavaScript can't deal with >= 2^53 numbers. That means the first 11 nonce bits can't be used, so the first 11 timestamp bits can't be used, which leaves 33 timestamp bits, which will run out after exactly 24 days, so let's say immediately. If you want to use integers, convert them to strings.
+
+  > #### `ex_format: :signed` or `:unsigned` disables encoded binary parsing {: .info}
+  >
+  > If you use an integer format as `:ex_format`, casting and dumping hex-encoded, url64-encoded and raw formats will be disabled.
+
+  That's because we can't disambiguate some binaries that are valid hex, url64 and raw binaries and also valid stringified integers. An example is "12345678901", which is either int 12_345_678_901 or url64-encoded `<<215, 109, 248, 231, 174, 252, 247, 77>>` (a.k.a. quite a different number).
+
+  By treating all incoming binaries as either a valid stringified int or invalid when using an integer Elixir format, this ambiguity is resolved at the cost of some flexibility. Note that `to_format/2` does *not* support stringified integers, but that does mean it converts reliably between formats once values have been cast/dumped/loaded.
+
+  Conversely, when using one of the binary formats, no binaries will be parsed as stringified ints.
   """
 
   @moduledoc """
@@ -66,7 +84,7 @@ defmodule Once do
 
   The negative integers will not cause problems with Postgres and MySQL, they both happily swallow them. Also, negative integers will only start to appear after ~70 years of usage.
 
-  If you don't like the formats, it's really easy to change them! The Elixir format especially, which can be changed at any time. Be mindful of JSON limitations if you use integers.
+  If you don't like the formats, it's really easy to change them! The Elixir format especially, which can be changed at any time.
 
   The supported formats are:
 
@@ -142,6 +160,11 @@ defmodule Once do
 
   @impl true
   def cast(nil, _), do: {:ok, nil}
+
+  def cast(value, %{ex_format: ex_format}) when ex_format in @int_formats and is_binary(value) do
+    parse_int_and(value, &convert_int(&1, ex_format))
+  end
+
   def cast(value, params), do: to_format(value, params.ex_format)
 
   @impl true
@@ -150,6 +173,11 @@ defmodule Once do
 
   @impl true
   def dump(nil, _, _), do: {:ok, nil}
+
+  def dump(value, _, params) when params.ex_format in @int_formats and is_binary(value) do
+    parse_int_and(value, &maybe_convert(:int, &1, params.db_format))
+  end
+
   def dump(value, _, params), do: to_format(value, params.db_format)
 
   @impl true
@@ -244,11 +272,11 @@ defmodule Once do
   defp convert_int(int, _), do: {:ok, int}
 
   # paddingless url64 en/decoding
-  defp encode64(value), do: {:ok, Base.url_encode64(value, padding: false)}
+  defp encode64(value), do: Base.url_encode64(value, padding: false)
   defp decode64(value), do: Base.url_decode64(value, padding: false)
 
   # hex en/decoding
-  defp encode16(value), do: {:ok, Base.encode16(value)}
+  defp encode16(value), do: Base.encode16(value)
   defp decode16(value), do: Base.decode16(value, case: :mixed)
 
   # identify the value's format, where ints are grouped together for convert_int/2 to deal with
@@ -302,8 +330,8 @@ defmodule Once do
   # convert a raw value to another format
   defp from_raw(raw, to_format)
   defp from_raw({:ok, raw}, :raw), do: {:ok, raw}
-  defp from_raw({:ok, raw}, :url64), do: encode64(raw)
-  defp from_raw({:ok, raw}, :hex), do: encode16(raw)
+  defp from_raw({:ok, raw}, :url64), do: {:ok, encode64(raw)}
+  defp from_raw({:ok, raw}, :hex), do: {:ok, encode16(raw)}
   defp from_raw({:ok, <<int::signed-64>>}, :signed), do: {:ok, int}
   defp from_raw({:ok, <<int::unsigned-64>>}, :unsigned), do: {:ok, int}
   defp from_raw(_, _), do: :error
@@ -319,4 +347,11 @@ defmodule Once do
   end
 
   defp check_nonce_type_option(params), do: params
+
+  defp parse_int_and(value, fun) do
+    case Integer.parse(value) do
+      {value, _} -> fun.(value)
+      _ -> :error
+    end
+  end
 end

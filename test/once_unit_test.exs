@@ -101,7 +101,8 @@ defmodule OnceUnitTest do
           Once.init(encrypt?: true, get_key: fn -> :crypto.strong_rand_bytes(24) end)
         end)
 
-      assert log =~ "[warning] option `:encrypt?` is deprecated, use `nonce_type: :encrypted` instead"
+      assert log =~
+               "[warning] option `:encrypt?` is deprecated, use `nonce_type: :encrypted` instead"
     end
 
     test "requires get_key if :type == :encrypted" do
@@ -179,6 +180,88 @@ defmodule OnceUnitTest do
       Process.sleep(5)
       assert <<prefix2::42, _::22>> = Once.autogenerate(params)
       assert prefix1 < prefix2
+    end
+  end
+
+  describe "cast/2" do
+    test "accepts and decodes url64-encoded when ex_format != int" do
+      ambiguous = "12345678901"
+      assert {:ok, raw} = Once.cast(ambiguous, %{ex_format: :raw})
+      assert <<int::64>> = raw
+      assert to_string(int) != ambiguous
+    end
+
+    test "accepts and decodes hex-encoded when ex_format != int" do
+      ambiguous = "1234567890123456"
+      assert {:ok, raw} = Once.cast(ambiguous, %{ex_format: :raw})
+      assert <<int::64>> = raw
+      assert to_string(int) != ambiguous
+    end
+
+    test "accepts and decodes raw when ex_format != int" do
+      ambiguous = "12345678"
+      assert {:ok, raw} = Once.cast(ambiguous, %{ex_format: :raw})
+      assert <<int::64>> = raw
+      assert to_string(int) != ambiguous
+    end
+
+    test "accepts and decodes url64-encoded when ex_format == int" do
+      ambiguous = 12_345_678_901
+      assert {:ok, ambiguous} == Once.cast("#{ambiguous}", %{ex_format: :unsigned})
+    end
+
+    test "accepts and decodes hex-encoded when ex_format == int" do
+      ambiguous = 1_234_567_890_123_456
+      assert {:ok, ambiguous} == Once.cast("#{ambiguous}", %{ex_format: :signed})
+    end
+
+    test "accepts and decodes raw when ex_format == int" do
+      ambiguous = 12_345_678
+      assert {:ok, ambiguous} == Once.cast("#{ambiguous}", %{ex_format: :unsigned})
+    end
+  end
+
+  describe "dump/3" do
+    test "accepts and decodes url64-encoded when ex_format != int" do
+      ambiguous = "12345678901"
+      assert {:ok, raw} = Once.dump(ambiguous, nil, %{ex_format: :hex, db_format: :raw})
+      assert <<int::64>> = raw
+      assert to_string(int) != ambiguous
+    end
+
+    test "accepts and decodes hex-encoded when ex_format != int" do
+      ambiguous = "1234567890123456"
+      assert {:ok, raw} = Once.dump(ambiguous, nil, %{ex_format: :hex, db_format: :raw})
+      assert <<int::64>> = raw
+      assert to_string(int) != ambiguous
+    end
+
+    test "accepts and decodes raw when ex_format != int" do
+      ambiguous = "12345678"
+      assert {:ok, raw} = Once.dump(ambiguous, nil, %{ex_format: :hex, db_format: :raw})
+      assert <<int::64>> = raw
+      assert to_string(int) != ambiguous
+    end
+
+    test "accepts and decodes url64-encoded when ex_format == int" do
+      ambiguous = 12_345_678_901
+
+      assert {:ok, ambiguous} ==
+               Once.dump("#{ambiguous}", nil, %{ex_format: :unsigned, db_format: :signed})
+    end
+
+    test "accepts and decodes hex-encoded when ex_format == int" do
+      ambiguous = 1_234_567_890_123_456
+
+      assert {:ok, ambiguous} ==
+               Once.dump("#{ambiguous}", nil, %{ex_format: :signed, db_format: :signed})
+    end
+
+    test "accepts and decodes raw when ex_format == int" do
+      ambiguous = 12_345_678
+
+      assert {:ok, ambiguous} ==
+               Once.dump("#{ambiguous}", nil, %{ex_format: :unsigned, db_format: :signed})
     end
   end
 end
