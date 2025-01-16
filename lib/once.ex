@@ -10,7 +10,7 @@ defmodule Once do
   - `:no_noncense` name of the NoNoncense instance used to generate new IDs (default `Once`)
   - `:ex_format` what an ID looks like in Elixir, one of `t:format/0` (default `:url64`)
   - `:db_format` what an ID looks like in your database, one of `t:format/0` (default `:signed`)
-  - `:type` how the nonce is generated, one of `t:nonce_type/0` (default `:counter`)
+  - `:nonce_type` how the nonce is generated, one of `t:nonce_type/0` (default `:counter`)
   - `:get_key` a zero-arity getter for the 192-bits encryption key, required if encryption is enabled
   - `:encrypt?` **deprecated**, use `type: :encrypted` (default `false`).
   """
@@ -78,7 +78,7 @@ defmodule Once do
 
   ## Encrypted IDs
 
-  By default, IDs are generated using a machine init timestamp, machine ID and counter (although they should be considered to be opague). This means they leak a little information and are somewhat predictable. If you don't like that, you can use encrypted IDs by passing options `type: :encrypted` and `get_key: fn -> <<_::192>> end`. Note that encrypted IDs will cost you the data locality and decrease index performance a little. The encryption algorithm is 3DES and that can't be changed. If you want to know why, take a look at [NoNoncense](https://hexdocs.pm/no_noncense/NoNoncense.html#module-encrypted-nonces).
+  By default, IDs are generated using a machine init timestamp, machine ID and counter (although they should be considered to be opague). This means they leak a little information and are somewhat predictable. If you don't like that, you can use encrypted IDs by passing options `nonce_type: :encrypted` and `get_key: fn -> <<_::192>> end`. Note that encrypted IDs will cost you the data locality and decrease index performance a little. The encryption algorithm is 3DES and that can't be changed. If you want to know why, take a look at [NoNoncense](https://hexdocs.pm/no_noncense/NoNoncense.html#module-encrypted-nonces).
   """
   require Logger
   use Ecto.ParameterizedType
@@ -109,14 +109,14 @@ defmodule Once do
           db_format: format(),
           encrypt?: boolean(),
           get_key: (-> <<_::24>>),
-          type: nonce_type()
+          nonce_type: nonce_type()
         ]
 
   @default_opts %{
     no_noncense: __MODULE__,
     ex_format: :url64,
     db_format: :signed,
-    type: :counter
+    nonce_type: :counter
   }
 
   @int_formats [:signed, :unsigned]
@@ -137,7 +137,7 @@ defmodule Once do
     opts
     |> Map.new()
     |> Enum.into(@default_opts)
-    |> check_type_option()
+    |> check_nonce_type_option()
   end
 
   @impl true
@@ -153,11 +153,11 @@ defmodule Once do
   def dump(value, _, params), do: to_format(value, params.db_format)
 
   @impl true
-  def autogenerate(params = %{type: :counter}) do
+  def autogenerate(params = %{nonce_type: :counter}) do
     NoNoncense.nonce(params.no_noncense, 64) |> to_format!(params.ex_format)
   end
 
-  def autogenerate(params = %{type: :sortable}) do
+  def autogenerate(params = %{nonce_type: :sortable}) do
     NoNoncense.sortable_nonce(params.no_noncense, 64) |> to_format!(params.ex_format)
   end
 
@@ -308,15 +308,15 @@ defmodule Once do
   defp from_raw({:ok, <<int::unsigned-64>>}, :unsigned), do: {:ok, int}
   defp from_raw(_, _), do: :error
 
-  defp check_type_option(params = %{type: :encrypted, get_key: _}), do: params
+  defp check_nonce_type_option(params = %{nonce_type: :encrypted, get_key: _}), do: params
 
-  defp check_type_option(%{type: :encrypted}),
+  defp check_nonce_type_option(%{nonce_type: :encrypted}),
     do: raise(ArgumentError, "you must provide :get_key")
 
-  defp check_type_option(params = %{encrypt?: true}) do
-    Logger.warning("option `:encrypt?` is deprecated, use `type: :encrypted` instead")
-    params |> Map.put(:type, :encrypted) |> check_type_option()
+  defp check_nonce_type_option(params = %{encrypt?: true}) do
+    Logger.warning("option `:encrypt?` is deprecated, use `nonce_type: :encrypted` instead")
+    params |> Map.put(:nonce_type, :encrypted) |> check_nonce_type_option()
   end
 
-  defp check_type_option(params), do: params
+  defp check_nonce_type_option(params), do: params
 end

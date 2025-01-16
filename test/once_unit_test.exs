@@ -101,19 +101,19 @@ defmodule OnceUnitTest do
           Once.init(encrypt?: true, get_key: fn -> :crypto.strong_rand_bytes(24) end)
         end)
 
-      assert log =~ "[warning] option `:encrypt?` is deprecated, use `type: :encrypted` instead"
+      assert log =~ "[warning] option `:encrypt?` is deprecated, use `nonce_type: :encrypted` instead"
     end
 
     test "requires get_key if :type == :encrypted" do
       assert_raise ArgumentError, "you must provide :get_key", fn ->
-        Once.init(type: :encrypted)
+        Once.init(nonce_type: :encrypted)
       end
     end
 
     test "sets defaults" do
       assert %{
                db_format: :signed,
-               type: :counter,
+               nonce_type: :counter,
                ex_format: :url64,
                no_noncense: Once
              } == Once.init()
@@ -151,7 +151,7 @@ defmodule OnceUnitTest do
     end
 
     test "generates encrypted nonces in configured format" do
-      params = Once.init(type: :encrypted, get_key: fn -> :crypto.strong_rand_bytes(24) end)
+      params = Once.init(nonce_type: :encrypted, get_key: fn -> :crypto.strong_rand_bytes(24) end)
 
       assert <<_::64>> = Map.put(params, :ex_format, :raw) |> Once.autogenerate()
       assert <<_::88>> = Map.put(params, :ex_format, :url64) |> Once.autogenerate()
@@ -162,7 +162,7 @@ defmodule OnceUnitTest do
     test "generates encrypted nonces" do
       params =
         Once.init(
-          type: :encrypted,
+          nonce_type: :encrypted,
           get_key: fn -> :crypto.strong_rand_bytes(24) end,
           ex_format: :raw
         )
@@ -173,7 +173,7 @@ defmodule OnceUnitTest do
     end
 
     test "generates sortable nonces" do
-      params = Once.init(type: :sortable, ex_format: :raw)
+      params = Once.init(nonce_type: :sortable, ex_format: :raw)
 
       assert <<prefix1::42, _::22>> = Once.autogenerate(params)
       Process.sleep(5)
