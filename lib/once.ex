@@ -8,7 +8,7 @@ defmodule Once do
   """
   @options_docs """
   - `:no_noncense` name of the NoNoncense instance used to generate new IDs (default `Once`)
-  - `:ex_format` what an ID looks like in Elixir, one of `t:format/0`. Be sure to read [the caveats](`m:Once#module-elixir-format-caveats`) (default `:url64`).
+  - `:ex_format` what an ID looks like in Elixir, one of `t:format/0` (default `:url64`). Be sure to read [the caveats](`m:Once#module-elixir-format-caveats`).
   - `:db_format` what an ID looks like in your database, one of `t:format/0` (default `:signed`)
   - `:nonce_type` how the nonce is generated, one of `t:nonce_type/0` (default `:counter`)
   - `:get_key` a zero-arity getter for the 192-bits encryption key, required if encryption is enabled
