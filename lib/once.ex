@@ -8,29 +8,11 @@ defmodule Once do
   """
   @options_docs """
   - `:no_noncense` name of the NoNoncense instance used to generate new IDs (default `Once`)
-  - `:ex_format` what an ID looks like in Elixir, one of `t:format/0` (default `:url64`)
+  - `:ex_format` what an ID looks like in Elixir, one of `t:format/0`. Be sure to read [the caveats](`m:Once#module-elixir-format-caveats`) (default `:url64`).
   - `:db_format` what an ID looks like in your database, one of `t:format/0` (default `:signed`)
   - `:nonce_type` how the nonce is generated, one of `t:nonce_type/0` (default `:counter`)
   - `:get_key` a zero-arity getter for the 192-bits encryption key, required if encryption is enabled
-  - `:encrypt?` **deprecated**, use `type: :encrypted` (default `false`).
-
-  ## Integer format caveats
-
-  > #### Don't use raw integers with JS clients {: .warning}
-  >
-  > Stringify int-format Once's.
-
-  While JSON does not impose a precision limit on numbers, JavaScript can't deal with >= 2^53 numbers. That means the first 11 nonce bits can't be used, so the first 11 timestamp bits can't be used, which leaves 33 timestamp bits, which will run out after exactly 24 days, so let's say immediately. If you want to use integers, convert them to strings.
-
-  > #### `ex_format: :signed` or `:unsigned` disables encoded binary parsing {: .info}
-  >
-  > If you use an integer format as `:ex_format`, casting and dumping hex-encoded, url64-encoded and raw formats will be disabled.
-
-  That's because we can't disambiguate some binaries that are valid hex, url64 and raw binaries and also valid stringified integers. An example is "12345678901", which is either int 12_345_678_901 or url64-encoded `<<215, 109, 248, 231, 174, 252, 247, 77>>` (a.k.a. quite a different number).
-
-  By treating all incoming binaries as either a valid stringified int or invalid when using an integer Elixir format, this ambiguity is resolved at the cost of some flexibility. Note that `to_format/2` does *not* support stringified integers, but that does mean it converts reliably between formats once values have been cast/dumped/loaded.
-
-  Conversely, when using one of the binary formats, no binaries will be parsed as stringified ints.
+  - `:encrypt?` **deprecated**, use `nonce_type: :encrypted` (default `false`).
   """
 
   @moduledoc """
@@ -89,6 +71,28 @@ defmodule Once do
   The supported formats are:
 
   #{@format_docs}
+
+  ### Elixir format caveats
+
+  Some caveats apply to the `:ex_format` options.
+
+  > #### Don't use raw integers with JS clients {: .warning}
+  >
+  > Encode `:signed` and `:unsigned` as strings.
+
+  While JSON does not impose a precision limit on numbers, JavaScript can't deal with >= 2^53 numbers. That means the first 11 nonce bits can't be used, so the first 11 timestamp bits can't be used, which leaves 33 timestamp bits, which will run out after exactly 24 days, so let's say immediately. If you want to use integers, convert them to strings.
+
+  > #### `ex_format: :signed` and `:unsigned` disable encoded binary parsing {: .info}
+  >
+  > If you use an integer format as `:ex_format`, casting and dumping hex-encoded, url64-encoded and raw formats will be disabled. On the other hand, parsing stringified integers ("123") will be supported.
+
+  That's because we can't disambiguate some binaries that are valid hex, url64 and raw binaries and also valid stringified integers. An example is "12345678901", which is either integer 12_345_678_901 or url64-encoded `<<215, 109, 248, 231, 174, 252, 247, 77>>` (a.k.a. quite a different number).
+
+  By treating all incoming binaries as either a valid stringified integer or invalid when using an integer Elixir format, this ambiguity is resolved at the cost of some flexibility. Note that `to_format/2` does *not* support stringified integers, but that does mean it converts reliably between formats once values have been cast/dumped/loaded.
+
+  > #### `ex_format: :hex`, `:url64` and `:raw` disable stringified integer parsing {: .info}
+  >
+  > If you use hex-encoded, url64-encoded or raw binary as `:ex_format`, parsing stringified integers will be disabled. On the other hand, parsing those binary formats is enabled.
 
   ## On local uniqueness
 
