@@ -84,15 +84,15 @@ defmodule Once do
 
   > #### `ex_format: :signed` and `:unsigned` disable encoded binary parsing {: .info}
   >
-  > If you use an integer format as `:ex_format`, casting and dumping hex-encoded, url64-encoded and raw formats will be disabled. On the other hand, parsing stringified integers ("123") will be supported.
+  > If you use an integer format as `:ex_format`, casting and dumping hex-encoded, url64-encoded and raw formats will be disabled. On the other hand, parsing numeric strings ("123") will be supported.
 
-  That's because we can't disambiguate some binaries that are valid hex, url64 and raw binaries and also valid stringified integers. An example is "12345678901", which is either integer 12_345_678_901 or url64-encoded `<<215, 109, 248, 231, 174, 252, 247, 77>>` (a.k.a. quite a different number).
+  That's because we can't disambiguate some binaries that are valid hex, url64 and raw binaries and also valid numeric strings. An example is "12345678901", which is either integer 12_345_678_901 or url64-encoded `<<215, 109, 248, 231, 174, 252, 247, 77>>` (a.k.a. quite a different number).
 
-  By treating all incoming binaries as either a valid stringified integer or invalid when using an integer Elixir format, this ambiguity is resolved at the cost of some flexibility. Note that `to_format/2` does *not* support stringified integers, but that does mean it converts reliably between formats once values have been cast/dumped/loaded.
+  By treating all incoming binaries as either a valid numeric string or invalid when using an integer Elixir format, this ambiguity is resolved at the cost of some flexibility. Note that `to_format/2` does *not* support numeric strings, but that does mean it converts reliably between formats once values have been cast/dumped/loaded.
 
-  > #### `ex_format: :hex`, `:url64` and `:raw` disable stringified integer parsing {: .info}
+  > #### `ex_format: :hex`, `:url64` and `:raw` disable numeric string parsing {: .info}
   >
-  > If you use hex-encoded, url64-encoded or raw binary as `:ex_format`, parsing stringified integers will be disabled. On the other hand, parsing those binary formats is enabled.
+  > If you use hex-encoded, url64-encoded or raw binary as `:ex_format`, parsing numeric strings will be disabled. On the other hand, parsing those binary formats is enabled.
 
   ## On local uniqueness
 
