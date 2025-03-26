@@ -246,13 +246,13 @@ defmodule Once do
       -200
 
       iex> Once.to_format!(Integer.pow(2, 64), :unsigned)
-      ** (ArgumentError) value could not be parsed
+      ** (ArgumentError) value could not be parsed: 18446744073709551616
   """
   @spec to_format!(binary() | integer(), format()) :: binary() | integer()
   def to_format!(value, format) do
     case to_format(value, format) do
       {:ok, value} -> value
-      _ -> raise ArgumentError, "value could not be parsed"
+      _ -> raise ArgumentError, "value could not be parsed: #{inspect(value)}"
     end
   end
 
