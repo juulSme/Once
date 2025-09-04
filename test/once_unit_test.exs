@@ -21,14 +21,14 @@ defmodule OnceUnitTest do
         raw: <<255, 255, 255, 255, 255, 255, 255, 255>>,
         signed: -1,
         unsigned: @unsigned_max,
-        hex: "FFFFFFFFFFFFFFFF"
+        hex: "ffffffffffffffff"
       },
       %{
         url64: "f_________8",
         raw: <<127, 255, 255, 255, 255, 255, 255, 255>>,
         signed: @signed_max,
         unsigned: @signed_max,
-        hex: "7FFFFFFFFFFFFFFF"
+        hex: "7fffffffffffffff"
       },
       %{
         url64: "gAAAAAAAAAA",
@@ -127,9 +127,10 @@ defmodule OnceUnitTest do
   end
 
   test "cast/dump/load accept nil value" do
-    assert {:ok, nil} = Once.cast(nil, %{})
-    assert {:ok, nil} = Once.dump(nil, %{}, %{})
-    assert {:ok, nil} = Once.load(nil, %{}, %{})
+    opts = Once.init()
+    assert {:ok, nil} = Once.cast(nil, opts)
+    assert {:ok, nil} = Once.dump(nil, %{}, opts)
+    assert {:ok, nil} = Once.load(nil, %{}, opts)
   end
 
   describe "autogenerate/1" do

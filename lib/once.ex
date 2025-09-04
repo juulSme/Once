@@ -60,7 +60,7 @@ defmodule Once do
       <<255, 255, 255, 255, 255, 255, 255, 255>>
       "__________8"
       18_446_744_073_709_551_615
-      "FFFFFFFFFFFFFFFF"
+      "ffffffffffffffff"
 
   If you use the defaults `:url64` as the Elixir format and `:signed` in your database, you could see `"AAAAAACYloA"` in Elixir and `10_000_000` in your database. The reasoning behind these defaults is that the encoded format is readable, short, and JSON safe by default, while the signed format means you can use a standard bigint column type.
 
@@ -104,6 +104,7 @@ defmodule Once do
   """
   require Logger
   use Ecto.ParameterizedType
+  import Once.Shared
 
   @typedoc """
   Formats in which a `Once` can be rendered.
@@ -155,12 +156,7 @@ defmodule Once do
 
   @impl true
   @spec init(opts()) :: map()
-  def init(opts \\ []) do
-    opts
-    |> Map.new()
-    |> Enum.into(@default_opts)
-    |> check_nonce_type_option()
-  end
+  def init(opts \\ []), do: opts |> Enum.into(@default_opts) |> check_nonce_type_option()
 
   @impl true
   def cast(nil, _), do: {:ok, nil}
@@ -186,16 +182,16 @@ defmodule Once do
 
   @impl true
   def autogenerate(params = %{nonce_type: :counter}) do
-    NoNoncense.nonce(params.no_noncense, 64) |> to_format!(params.ex_format)
+    NoNoncense.nonce(params.no_noncense, 64) |> from_raw(params.ex_format)
   end
 
   def autogenerate(params = %{nonce_type: :sortable}) do
-    NoNoncense.sortable_nonce(params.no_noncense, 64) |> to_format!(params.ex_format)
+    NoNoncense.sortable_nonce(params.no_noncense, 64) |> from_raw(params.ex_format)
   end
 
   def autogenerate(params) do
     NoNoncense.encrypted_nonce(params.no_noncense, 64, params.get_key.())
-    |> to_format!(params.ex_format)
+    |> from_raw(params.ex_format)
   end
 
   #####################
@@ -213,7 +209,7 @@ defmodule Once do
       iex> Once.to_format(-2301195303365014983, :unsigned)
       {:ok, 16145548770344536633}
       iex> Once.to_format(16145548770344536633, :hex)
-      {:ok, "E010831058218A39"}
+      {:ok, "e010831058218a39"}
       iex> Once.to_format("E010831058218a39", :url64)
       {:ok, "4BCDEFghijk"}
 
@@ -224,8 +220,8 @@ defmodule Once do
       iex> Once.to_format(<<255, 255, 255, 255, 255, 255, 255, 255>>, :unsigned)
       {:ok, 18446744073709551615}
       iex> Once.to_format(18446744073709551615, :hex)
-      {:ok, "FFFFFFFFFFFFFFFF"}
-      iex> Once.to_format("FFFFFFFFFFFFFFFF", :signed)
+      {:ok, "ffffffffffffffff"}
+      iex> Once.to_format("ffffffffffffffff", :signed)
       {:ok, -1}
 
       iex> Once.to_format(Integer.pow(2, 64), :unsigned)
@@ -275,14 +271,6 @@ defmodule Once do
 
   defp convert_int(int, _), do: {:ok, int}
 
-  # paddingless url64 en/decoding
-  defp encode64(value), do: Base.url_encode64(value, padding: false)
-  defp decode64(value), do: Base.url_decode64(value, padding: false)
-
-  # hex en/decoding
-  defp encode16(value), do: Base.encode16(value)
-  defp decode16(value), do: Base.decode16(value, case: :mixed)
-
   # identify the value's format, where ints are grouped together for convert_int/2 to deal with
   defp identify_format(value)
   defp identify_format(<<_::88>>), do: :url64
@@ -314,7 +302,7 @@ defmodule Once do
     do: convert_int(value, int_format)
 
   defp maybe_convert(format_in, value, format_out),
-    do: value |> to_raw(format_in) |> from_raw(format_out)
+    do: value |> to_raw(format_in) |> from_ok_raw(format_out)
 
   # convert a value to raw format
   defp to_raw(value, from_format)
@@ -332,25 +320,29 @@ defmodule Once do
   defp to_raw(_, :error), do: :error
 
   # convert a raw value to another format
+  defp from_ok_raw(ok_raw_tuple, to_format)
+  defp from_ok_raw({:ok, raw}, to_format), do: {:ok, from_raw(raw, to_format)}
+  defp from_ok_raw(_, _), do: :error
+
   defp from_raw(raw, to_format)
-  defp from_raw({:ok, raw}, :raw), do: {:ok, raw}
-  defp from_raw({:ok, raw}, :url64), do: {:ok, encode64(raw)}
-  defp from_raw({:ok, raw}, :hex), do: {:ok, encode16(raw)}
-  defp from_raw({:ok, <<int::signed-64>>}, :signed), do: {:ok, int}
-  defp from_raw({:ok, <<int::unsigned-64>>}, :unsigned), do: {:ok, int}
-  defp from_raw(_, _), do: :error
+  defp from_raw(raw, :raw), do: raw
+  defp from_raw(raw, :url64), do: encode64(raw)
+  defp from_raw(raw, :hex), do: encode16(raw)
+  defp from_raw(<<int::signed-64>>, :signed), do: int
+  defp from_raw(<<int::unsigned-64>>, :unsigned), do: int
 
-  defp check_nonce_type_option(params = %{nonce_type: :encrypted, get_key: _}), do: params
+  @doc false
+  def check_nonce_type_option(params = %{nonce_type: :encrypted, get_key: _}), do: params
 
-  defp check_nonce_type_option(%{nonce_type: :encrypted}),
+  def check_nonce_type_option(%{nonce_type: :encrypted}),
     do: raise(ArgumentError, "you must provide :get_key")
 
-  defp check_nonce_type_option(params = %{encrypt?: true}) do
+  def check_nonce_type_option(params = %{encrypt?: true}) do
     Logger.warning("option `:encrypt?` is deprecated, use `nonce_type: :encrypted` instead")
     params |> Map.put(:nonce_type, :encrypted) |> check_nonce_type_option()
   end
 
-  defp check_nonce_type_option(params), do: params
+  def check_nonce_type_option(params), do: params
 
   defp parse_int_and(value, fun) do
     case Integer.parse(value) do
