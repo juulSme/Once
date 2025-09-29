@@ -64,7 +64,7 @@ defmodule Once do
 
   If you use the defaults `:url64` as the Elixir format and `:signed` in your database, you could see `"AAAAAACYloA"` in Elixir and `10_000_000` in your database. The reasoning behind these defaults is that the encoded format is readable, short, and JSON safe by default, while the signed format means you can use a standard bigint column type.
 
-  The negative integers will not cause problems with Postgres and MySQL, they both happily swallow them. Also, negative integers will only start to appear after ~70 years of usage.
+  The negative integers will not cause problems with Postgres and MySQL, they both happily swallow them. Also, negative integers will only start to appear after ~70 years of usage. However, be careful if you wish to [sort by ID](#module-sorting-by-id).
 
   If you don't like the formats, it's really easy to change them! The Elixir format especially, which can be changed at any time.
 
@@ -93,6 +93,33 @@ defmodule Once do
   > #### `ex_format: :hex`, `:url64` and `:raw` disable numeric string parsing {: .info}
   >
   > If you use hex-encoded, url64-encoded or raw binary as `:ex_format`, parsing numeric strings will be disabled. On the other hand, parsing those binary formats is enabled.
+
+  ### Sorting by ID
+
+  The various formats have different sorting behaviors for the same underlying value, which becomes especially problematic with values equivalent to negative integers. For example, here are the same set of values in ascending sort order for each format:
+
+      # signed ints (natural signed integer order)
+      [-9223372036854775808, -1, 0, 1, 9223372036854775807]
+
+      # unsigned ints (treats negative signed values as large positive numbers, results in [0, 1, signed-max, signed-min, -1])
+      [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]
+
+      # raw (binary comparison, same order as unsigned)
+      [<<0::64>>, <<1::64>>, <<127, 255, 255, 255, 255, 255, 255, 255>>, <<128, 0, 0, 0, 0, 0, 0, 0>>, <<255, 255, 255, 255, 255, 255, 255, 255>>]
+
+      # hex (lexicographic string comparison, same order as unsigned)
+      ["0000000000000000", "0000000000000001", "7fffffffffffffff", "8000000000000000", "ffffffffffffffff"]
+
+      # url64 (lexicographic but with different alphabet ordering, resulting in [0, 1, -1, signed-max, signed-min])
+      ["AAAAAAAAAAA", "AAAAAAAAAAE", "__________8", "f_________8", "gAAAAAAAAAA"]
+
+  If you want to rely on Once IDs for chronological sorting (especially with sortable nonces), choose formats that preserve unsigned integer ordering. This means using `:unsigned`, `:raw`, `:hex`, or `:signed` integers within their positive range (which gives ~70 years of usage before hitting negative values).
+
+  Avoid `:url64` for sorting; its alphabet wasn't designed with lexicographic ordering in mind, making it unsuitable.
+
+  #### Database considerations
+  - PostgreSQL: Uses signed bigint with no native unsigned type. An "ORDER BY id" query will produce unexpected results when Once IDs become negative (~70 years after epoch). Consider using `:raw` format (stored as bytea) for correct sorting throughout the full range, combined with `:unsigned` or `:hex` format in your application. Since PG's raw bytes will often be rendered as hex, using hex in Elixir will simplify value comparison.
+  - MySQL: Supports unsigned bigint, so `:unsigned` format works perfectly for sorting.
 
   ## On local uniqueness
 
