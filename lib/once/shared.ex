@@ -8,4 +8,7 @@ defmodule Once.Shared do
   # hex en/decoding
   def encode16(value), do: Base.encode16(value, case: :lower)
   def decode16(value), do: Base.decode16(value, case: :mixed)
+
+  def encode32(value), do: Base.encode32(value, case: :lower, padding: false)
+  def decode32(value), do: Base.decode32(value, case: :mixed, padding: false)
 end

@@ -170,7 +170,7 @@ defmodule Once do
   }
 
   @int_formats [:signed, :unsigned]
-  @encoded_formats [:url64, :hex]
+  @encoded_formats [:url64, :hex, :base32]
 
   #######################
   # Type implementation #
@@ -304,26 +304,16 @@ defmodule Once do
   defp identify_format(<<_::64>>), do: :raw
   defp identify_format(<<_::128>>), do: :hex
   defp identify_format(int) when is_integer(int), do: :int
+  defp identify_format(<<_::104>>), do: :base32
   defp identify_format(_), do: :error
 
   # convert (or verify) a value from one format to another
   defp maybe_convert(format_in, value, format_out)
   defp maybe_convert(:raw, value, :raw), do: {:ok, value}
 
-  defp maybe_convert(:url64, value, :url64) do
-    # we must check that the encoding is valid
-    case decode64(value) do
-      {:ok, _} -> {:ok, value}
-      _ -> :error
-    end
-  end
-
-  defp maybe_convert(:hex, value, :hex) do
-    case decode16(value) do
-      {:ok, _} -> {:ok, value}
-      _ -> :error
-    end
-  end
+  defp maybe_convert(:url64, value, :url64), do: validate_encoding(value, &decode64/1)
+  defp maybe_convert(:hex, value, :hex), do: validate_encoding(value, &decode16/1)
+  defp maybe_convert(:base32, value, :base32), do: validate_encoding(value, &decode32/1)
 
   defp maybe_convert(:int, value, int_format) when int_format in @int_formats,
     do: convert_int(value, int_format)
@@ -336,6 +326,7 @@ defmodule Once do
   defp to_raw(value, :raw), do: {:ok, value}
   defp to_raw(value, :url64), do: decode64(value)
   defp to_raw(value, :hex), do: decode16(value)
+  defp to_raw(value, :base32), do: decode32(value)
 
   defp to_raw(value, :int) do
     case convert_int(value, :signed) do
@@ -355,6 +346,7 @@ defmodule Once do
   defp from_raw(raw, :raw), do: raw
   defp from_raw(raw, :url64), do: encode64(raw)
   defp from_raw(raw, :hex), do: encode16(raw)
+  defp from_raw(raw, :base32), do: encode32(raw)
   defp from_raw(<<int::signed-64>>, :signed), do: int
   defp from_raw(<<int::unsigned-64>>, :unsigned), do: int
 
@@ -374,6 +366,13 @@ defmodule Once do
   defp parse_int_and(value, fun) do
     case Integer.parse(value) do
       {value, _} -> fun.(value)
+      _ -> :error
+    end
+  end
+
+  defp validate_encoding(value, decode) do
+    case decode.(value) do
+      {:ok, _} -> {:ok, value}
       _ -> :error
     end
   end

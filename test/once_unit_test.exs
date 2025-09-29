@@ -14,21 +14,24 @@ defmodule OnceUnitTest do
         raw: <<0, 0, 0, 0, 0, 0, 0, 0>>,
         signed: 0,
         unsigned: 0,
-        hex: "0000000000000000"
+        hex: "0000000000000000",
+        base32: "aaaaaaaaaaaaa"
       },
       %{
         url64: "__________8",
         raw: <<255, 255, 255, 255, 255, 255, 255, 255>>,
         signed: -1,
         unsigned: @unsigned_max,
-        hex: "ffffffffffffffff"
+        hex: "ffffffffffffffff",
+        base32: "7777777777776"
       },
       %{
         url64: "f_________8",
         raw: <<127, 255, 255, 255, 255, 255, 255, 255>>,
         signed: @signed_max,
         unsigned: @signed_max,
-        hex: "7fffffffffffffff"
+        hex: "7fffffffffffffff",
+        base32: "p777777777776"
       },
       %{
         url64: "gAAAAAAAAAA",
@@ -44,7 +47,8 @@ defmodule OnceUnitTest do
         raw: :error,
         signed: :error,
         unsigned: :error,
-        hex: :error
+        hex: :error,
+        base32: :error
       },
       %{
         invalid: @signed_min - 1,
@@ -52,16 +56,26 @@ defmodule OnceUnitTest do
         raw: :error,
         signed: :error,
         unsigned: :error,
-        hex: :error
+        hex: :error,
+        base32: :error
       },
-      %{invalid: "a", url64: :error, raw: :error, signed: :error, unsigned: :error, hex: :error},
+      %{
+        invalid: "a",
+        url64: :error,
+        raw: :error,
+        signed: :error,
+        unsigned: :error,
+        hex: :error,
+        base32: :error
+      },
       %{
         invalid: "++++++++++A",
         url64: :error,
         raw: :error,
         signed: :error,
         unsigned: :error,
-        hex: :error
+        hex: :error,
+        base32: :error
       },
       %{
         invalid: "XX12121212121212",
@@ -69,7 +83,8 @@ defmodule OnceUnitTest do
         raw: :error,
         signed: :error,
         unsigned: :error,
-        hex: :error
+        hex: :error,
+        base32: :error
       }
     ]
 
@@ -213,6 +228,11 @@ defmodule OnceUnitTest do
 
     test "accepts and decodes hex-encoded when ex_format == int" do
       ambiguous = 1_234_567_890_123_456
+      assert {:ok, ambiguous} == Once.cast("#{ambiguous}", %{ex_format: :signed})
+    end
+
+    test "accepts and decodes base32-encoded when ex_format == int" do
+      ambiguous = 1_234_567_890_123
       assert {:ok, ambiguous} == Once.cast("#{ambiguous}", %{ex_format: :signed})
     end
 
