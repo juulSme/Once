@@ -22,7 +22,7 @@ defmodule Once do
   - encrypted: unique and unpredictable, like a UUIDv4 but shorter
   - sortable: time-sortable like a [Snowflake ID](https://en.wikipedia.org/wiki/Snowflake_ID)
 
-  A Once can look however you want, and can be stored in multiple ways as well. By default, in Elixir it's a url64-encoded 11-char string, and in the database it's a signed bigint. By using the `:ex_format` and `:db_format` options, you can choose both the Elixir and storage format out of `t:format/0`. You can pick any combination and use `to_format/2` to transform them as you wish!
+  A Once can look however you want, and can be stored in multiple ways as well. By default, in Elixir it's a url64-encoded 11-char string, and in the database it's a signed bigint. By using the `:ex_format` and `:db_format` options, you can choose both the Elixir and storage format out of `t:format/0`. You can pick any combination and use `to_format/3` to transform them as you wish!
 
   Because a Once fits into an SQL bigint, they use little space and keep indexes small and fast. Because of their [structure](https://hexdocs.pm/no_noncense/NoNoncense.html#module-nonce-types) they have counter-like data locality, which helps your indexes perform well, [unlike UUIDv4s](https://www.cybertec-postgresql.com/en/unexpected-downsides-of-uuid-keys-in-postgresql/). If you don't care about that and want unpredictable IDs, you can use encrypted IDs that seem random and are still unique.
 
@@ -88,7 +88,7 @@ defmodule Once do
 
   That's because we can't disambiguate some binaries that are valid hex, url64 and raw binaries and also valid numeric strings. An example is "12345678901", which is either integer 12_345_678_901 or url64-encoded `<<215, 109, 248, 231, 174, 252, 247, 77>>` (a.k.a. quite a different number).
 
-  By treating all incoming binaries as either a valid numeric string or invalid when using an integer Elixir format, this ambiguity is resolved at the cost of some flexibility. Note that `to_format/2` does *not* support numeric strings, but that does mean it converts reliably between formats once values have been cast/dumped/loaded.
+  By treating all incoming binaries as either a valid numeric string or invalid when using an integer Elixir format, this ambiguity is resolved at the cost of some flexibility. Note that `to_format/3` only supports numeric strings with option `:parse_int`.
 
   > #### `ex_format: :hex`, `:url64` and `:raw` disable numeric string parsing {: .info}
   >
@@ -237,17 +237,16 @@ defmodule Once do
   # Mapping functions #
   #####################
 
-  @typedoc """
-  Options for `to_format/3`.
-
-  #{@options_docs}
+  @to_format_opts_docs """
+  - `:parse_int` parse numeric strings like `"123"`. Will give unexpected results with all-int hex/url64 inputs.
   """
+
   @type to_format_opt :: {:parse_int, boolean()}
 
   @typedoc """
   Options for `to_format/3`.
 
-  #{@options_docs}
+  #{@to_format_opts_docs}
   """
   @type to_format_opts :: [to_format_opt()]
 
@@ -256,7 +255,8 @@ defmodule Once do
   The formats can be found in `t:format/0`.
 
   ## Options
-  - `:parse_int` parse stringified integers like `"123"`. Will give unexpected results with all-int hex/url64 inputs.
+
+  #{@to_format_opts_docs}
 
   ## Examples
 
@@ -285,7 +285,7 @@ defmodule Once do
       iex> Once.to_format(Integer.pow(2, 64), :unsigned)
       :error
 
-      # formatting stringified ints is supported using `:parse_int`
+      # numeric strings are supported using `:parse_int`
       iex> Once.to_format("-2301195303365014983", :unsigned, parse_int: true)
       {:ok, 16145548770344536633}
       iex> Once.to_format("16145548770344536633", :hex, parse_int: true)
@@ -300,7 +300,7 @@ defmodule Once do
   end
 
   @doc """
-  Same as `to_format/2` but raises on error.
+  Same as `to_format/3` but raises on error.
 
       iex> -200
       ...> |> Once.to_format!(:url64)

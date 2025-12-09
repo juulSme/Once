@@ -8,7 +8,7 @@ defmodule OnceUnitTest do
   @unsigned_max @range - 1
   @all_error Map.from_keys([:url64, :raw, :signed, :unsigned, :hex], :error)
 
-  describe "to_format/2" do
+  describe "to_format/3" do
     @format_tests [
                     %{
                       url64: "AAAAAAAAAAA",

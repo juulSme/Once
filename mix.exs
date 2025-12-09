@@ -23,7 +23,7 @@ defmodule Once.MixProject do
       name: "Once",
       docs: [
         source_ref: ~s(main),
-        extras: ~w(./README.md ./LICENSE.md),
+        extras: ~w(./README.md ./LICENSE.md ./CHANGELOG.md),
         main: "Once",
         skip_undefined_reference_warnings_on: ~w(),
         filter_modules: ~r(^Elixir\.Once\.?.*)
