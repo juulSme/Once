@@ -6,72 +6,44 @@ defmodule OnceUnitTest do
   @signed_min -Integer.pow(2, 63)
   @signed_max Integer.pow(2, 63) - 1
   @unsigned_max @range - 1
+  @all_error Map.from_keys([:url64, :raw, :signed, :unsigned, :hex], :error)
 
   describe "to_format/2" do
     @format_tests [
-      %{
-        url64: "AAAAAAAAAAA",
-        raw: <<0, 0, 0, 0, 0, 0, 0, 0>>,
-        signed: 0,
-        unsigned: 0,
-        hex: "0000000000000000"
-      },
-      %{
-        url64: "__________8",
-        raw: <<255, 255, 255, 255, 255, 255, 255, 255>>,
-        signed: -1,
-        unsigned: @unsigned_max,
-        hex: "ffffffffffffffff"
-      },
-      %{
-        url64: "f_________8",
-        raw: <<127, 255, 255, 255, 255, 255, 255, 255>>,
-        signed: @signed_max,
-        unsigned: @signed_max,
-        hex: "7fffffffffffffff"
-      },
-      %{
-        url64: "gAAAAAAAAAA",
-        raw: <<128, 0, 0, 0, 0, 0, 0, 0>>,
-        signed: @signed_min,
-        unsigned: @signed_max + 1,
-        hex: "8000000000000000"
-      },
-      # invalid inputs
-      %{
-        invalid: @range,
-        url64: :error,
-        raw: :error,
-        signed: :error,
-        unsigned: :error,
-        hex: :error
-      },
-      %{
-        invalid: @signed_min - 1,
-        url64: :error,
-        raw: :error,
-        signed: :error,
-        unsigned: :error,
-        hex: :error
-      },
-      %{invalid: "a", url64: :error, raw: :error, signed: :error, unsigned: :error, hex: :error},
-      %{
-        invalid: "++++++++++A",
-        url64: :error,
-        raw: :error,
-        signed: :error,
-        unsigned: :error,
-        hex: :error
-      },
-      %{
-        invalid: "XX12121212121212",
-        url64: :error,
-        raw: :error,
-        signed: :error,
-        unsigned: :error,
-        hex: :error
-      }
-    ]
+                    %{
+                      url64: "AAAAAAAAAAA",
+                      raw: <<0, 0, 0, 0, 0, 0, 0, 0>>,
+                      signed: 0,
+                      unsigned: 0,
+                      hex: "0000000000000000"
+                    },
+                    %{
+                      url64: "__________8",
+                      raw: <<255, 255, 255, 255, 255, 255, 255, 255>>,
+                      signed: -1,
+                      unsigned: @unsigned_max,
+                      hex: "ffffffffffffffff"
+                    },
+                    %{
+                      url64: "f_________8",
+                      raw: <<127, 255, 255, 255, 255, 255, 255, 255>>,
+                      signed: @signed_max,
+                      unsigned: @signed_max,
+                      hex: "7fffffffffffffff"
+                    },
+                    %{
+                      url64: "gAAAAAAAAAA",
+                      raw: <<128, 0, 0, 0, 0, 0, 0, 0>>,
+                      signed: @signed_min,
+                      unsigned: @signed_max + 1,
+                      hex: "8000000000000000"
+                    }
+                  ] ++
+                    Enum.map(
+                      # invalid inputs
+                      [@range, @signed_min - 1, "a", "++++++++++A", "XX12121212121212"],
+                      &Map.put(@all_error, :invalid, &1)
+                    )
 
     for formats_values <- @format_tests,
         {format_in, input} <- formats_values,

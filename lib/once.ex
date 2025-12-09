@@ -153,14 +153,20 @@ defmodule Once do
 
   #{@options_docs}
   """
-  @type opts :: [
-          no_noncense: module(),
-          ex_format: format(),
-          db_format: format(),
-          encrypt?: boolean(),
-          get_key: (-> <<_::24>>),
-          nonce_type: nonce_type()
-        ]
+  @type opt ::
+          {:no_noncense, module()}
+          | {:ex_format, format()}
+          | {:db_format, format()}
+          | {:encrypt?, boolean()}
+          | {:get_key, (-> <<_::24>>)}
+          | {:nonce_type, nonce_type()}
+
+  @typedoc """
+  Options to initialize `Once`.
+
+  #{@options_docs}
+  """
+  @type opts :: [opt()]
 
   @default_opts %{
     no_noncense: __MODULE__,
@@ -189,7 +195,10 @@ defmodule Once do
   def cast(nil, _), do: {:ok, nil}
 
   def cast(value, %{ex_format: ex_format}) when ex_format in @int_formats and is_binary(value) do
-    parse_int_and(value, &convert_int(&1, ex_format))
+    case Integer.parse(value) do
+      {parsed, _} -> convert_int(parsed, ex_format)
+      _ -> :error
+    end
   end
 
   def cast(value, params), do: to_format(value, params.ex_format)
@@ -202,7 +211,10 @@ defmodule Once do
   def dump(nil, _, _), do: {:ok, nil}
 
   def dump(value, _, params) when params.ex_format in @int_formats and is_binary(value) do
-    parse_int_and(value, &maybe_convert(:int, &1, params.db_format))
+    case Integer.parse(value) do
+      {parsed, _} -> maybe_convert(:int, parsed, params.db_format)
+      _ -> :error
+    end
   end
 
   def dump(value, _, params), do: to_format(value, params.db_format)
@@ -225,9 +237,28 @@ defmodule Once do
   # Mapping functions #
   #####################
 
+  @typedoc """
+  Options for `to_format/3`.
+
+  #{@options_docs}
+  """
+  @type to_format_opt :: {:parse_int, boolean()}
+
+  @typedoc """
+  Options for `to_format/3`.
+
+  #{@options_docs}
+  """
+  @type to_format_opts :: [to_format_opt()]
+
   @doc """
   Transform the different forms that a `Once` can take to one another.
   The formats can be found in `t:format/0`.
+
+  ## Options
+  - `:parse_int` parse stringified integers like `"123"`. Will give unexpected results with all-int hex/url64 inputs.
+
+  ## Examples
 
       iex> Once.to_format("4BCDEFghijk", :raw)
       {:ok, <<224, 16, 131, 16, 88, 33, 138, 57>>}
@@ -253,9 +284,20 @@ defmodule Once do
 
       iex> Once.to_format(Integer.pow(2, 64), :unsigned)
       :error
+
+      # formatting stringified ints is supported using `:parse_int`
+      iex> Once.to_format("-2301195303365014983", :unsigned, parse_int: true)
+      {:ok, 16145548770344536633}
+      iex> Once.to_format("16145548770344536633", :hex, parse_int: true)
+      {:ok, "e010831058218a39"}
   """
-  @spec to_format(binary() | integer(), format()) :: {:ok, binary() | integer()} | :error
-  def to_format(value, format), do: identify_format(value) |> maybe_convert(value, format)
+  @spec to_format(binary() | integer(), format(), to_format_opts()) ::
+          {:ok, binary() | integer()} | :error
+  def to_format(value, format, opts \\ []) do
+    value = maybe_parse_int(value, opts[:parse_int])
+    format_in = identify_format(value)
+    maybe_convert(format_in, value, format)
+  end
 
   @doc """
   Same as `to_format/2` but raises on error.
@@ -271,30 +313,30 @@ defmodule Once do
       iex> Once.to_format!(Integer.pow(2, 64), :unsigned)
       ** (ArgumentError) value could not be parsed: 18446744073709551616
   """
-  @spec to_format!(binary() | integer(), format()) :: binary() | integer()
-  def to_format!(value, format) do
-    case to_format(value, format) do
-      {:ok, value} -> value
-      _ -> raise ArgumentError, "value could not be parsed: #{inspect(value)}"
-    end
+  @spec to_format!(binary() | integer(), format(), to_format_opts()) :: binary() | integer()
+  def to_format!(value, format, opts \\ []) do
+    to_format(value, format, opts) |> do_to_format!(value)
   end
 
   ###########
   # Private #
   ###########
 
-  @range Integer.pow(2, 64)
+  @compile {:inline, identify_format: 1, to_raw: 2}
+
+  @bigint_size Integer.pow(2, 64)
   @signed_min -Integer.pow(2, 63)
   @signed_max Integer.pow(2, 63) - 1
-  @unsigned_max @range - 1
+  @unsigned_min 0
+  @unsigned_max @bigint_size - 1
 
   # convert a signed to unsigned int and back
   defp convert_int(int, format)
   defp convert_int(int, _) when int < @signed_min, do: :error
   defp convert_int(int, _) when int > @unsigned_max, do: :error
 
-  defp convert_int(int, :signed) when int > @signed_max, do: {:ok, int - @range}
-  defp convert_int(int, :unsigned) when int < 0, do: {:ok, int + @range}
+  defp convert_int(int, :signed) when int > @signed_max, do: {:ok, int - @bigint_size}
+  defp convert_int(int, :unsigned) when int < @unsigned_min, do: {:ok, int + @bigint_size}
 
   defp convert_int(int, _), do: {:ok, int}
 
@@ -328,8 +370,14 @@ defmodule Once do
   defp maybe_convert(:int, value, int_format) when int_format in @int_formats,
     do: convert_int(value, int_format)
 
-  defp maybe_convert(format_in, value, format_out),
-    do: value |> to_raw(format_in) |> from_ok_raw(format_out)
+  defp maybe_convert(format_in, value, format_out) do
+    value
+    |> to_raw(format_in)
+    |> case do
+      {:ok, raw} -> {:ok, from_raw(raw, format_out)}
+      _ -> :error
+    end
+  end
 
   # convert a value to raw format
   defp to_raw(value, from_format)
@@ -346,11 +394,6 @@ defmodule Once do
 
   defp to_raw(_, :error), do: :error
 
-  # convert a raw value to another format
-  defp from_ok_raw(ok_raw_tuple, to_format)
-  defp from_ok_raw({:ok, raw}, to_format), do: {:ok, from_raw(raw, to_format)}
-  defp from_ok_raw(_, _), do: :error
-
   defp from_raw(raw, to_format)
   defp from_raw(raw, :raw), do: raw
   defp from_raw(raw, :url64), do: encode64(raw)
@@ -358,23 +401,25 @@ defmodule Once do
   defp from_raw(<<int::signed-64>>, :signed), do: int
   defp from_raw(<<int::unsigned-64>>, :unsigned), do: int
 
-  @doc false
-  def check_nonce_type_option(params = %{nonce_type: :encrypted, get_key: _}), do: params
+  defp check_nonce_type_option(params = %{nonce_type: :encrypted, get_key: _}), do: params
 
-  def check_nonce_type_option(%{nonce_type: :encrypted}),
+  defp check_nonce_type_option(%{nonce_type: :encrypted}),
     do: raise(ArgumentError, "you must provide :get_key")
 
-  def check_nonce_type_option(params = %{encrypt?: true}) do
+  defp check_nonce_type_option(params = %{encrypt?: true}) do
     Logger.warning("option `:encrypt?` is deprecated, use `nonce_type: :encrypted` instead")
     params |> Map.put(:nonce_type, :encrypted) |> check_nonce_type_option()
   end
 
-  def check_nonce_type_option(params), do: params
+  defp check_nonce_type_option(params), do: params
 
-  defp parse_int_and(value, fun) do
-    case Integer.parse(value) do
-      {value, _} -> fun.(value)
+  defp maybe_parse_int(value, true) when is_binary(value) do
+    try do
+      String.to_integer(value)
+    rescue
       _ -> :error
     end
   end
+
+  defp maybe_parse_int(value, _), do: value
 end
