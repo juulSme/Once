@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.9] - 2025-12-09
+## [0.1.0] - 2025-12-09
 
 - Use Elixir 1.19 features when possible (`Base.valid64?/2`)
 - Improve `Once.to_format/2` and `Once.to_format!/2` by adding a third opts param. Add option `:parse_int` to parse numeric strings to ints ("123" -> 123).
