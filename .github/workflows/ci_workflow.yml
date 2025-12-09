@@ -29,17 +29,15 @@ jobs:
     strategy:
       # https://hexdocs.pm/elixir/1.18/compatibility-and-deprecations.html#compatibility-between-elixir-and-erlang-otp
       matrix:
-        elixir: [1.14.x, 1.18.x]
-        otp: [25.x, 27.x]
-        exclude:
+        include:
           - elixir: 1.14.x
-            otp: 27.x
-          - elixir: 1.18.x
             otp: 25.x
+          - elixir: 1.19.x
+            otp: 28.x
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - uses: erlef/setup-beam@v1
         id: setup-beam
         with:
@@ -60,7 +58,7 @@ jobs:
         run: |
           mix deps.get
       - name: Check code formatting
-        if: matrix.elixir == '1.18.x'
+        if: matrix.elixir == '1.19.x'
         run: mix format --check-formatted
       - name: Compile dependencies
         run: mix deps.compile
@@ -69,5 +67,5 @@ jobs:
       - name: Run tests
         run: mix test
       - name: Create docs
-        if: matrix.elixir == '1.18.x'
+        if: matrix.elixir == '1.19.x'
         run: mix docs

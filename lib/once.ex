@@ -353,18 +353,11 @@ defmodule Once do
   defp maybe_convert(:raw, value, :raw), do: {:ok, value}
 
   defp maybe_convert(:url64, value, :url64) do
-    # we must check that the encoding is valid
-    case decode64(value) do
-      {:ok, _} -> {:ok, value}
-      _ -> :error
-    end
+    if valid64?(value), do: {:ok, value}, else: :error
   end
 
   defp maybe_convert(:hex, value, :hex) do
-    case decode16(value) do
-      {:ok, _} -> {:ok, value}
-      _ -> :error
-    end
+    if valid16?(value), do: {:ok, value}, else: :error
   end
 
   defp maybe_convert(:int, value, int_format) when int_format in @int_formats,
