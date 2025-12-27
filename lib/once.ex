@@ -12,7 +12,6 @@ defmodule Once do
   - `:db_format` what an ID looks like in your database, one of `t:format/0` (default `:signed`)
   - `:nonce_type` how the nonce is generated, one of `t:nonce_type/0` (default `:counter`)
   - `:get_key` a zero-arity getter for the 192-bits encryption key, required if encryption is enabled
-  - `:encrypt?` **deprecated**, use `nonce_type: :encrypted` (default `false`).
   """
 
   @moduledoc """
@@ -157,7 +156,6 @@ defmodule Once do
           {:no_noncense, module()}
           | {:ex_format, format()}
           | {:db_format, format()}
-          | {:encrypt?, boolean()}
           | {:get_key, (-> <<_::24>>)}
           | {:nonce_type, nonce_type()}
 
@@ -398,11 +396,6 @@ defmodule Once do
 
   defp check_nonce_type_option(%{nonce_type: :encrypted}),
     do: raise(ArgumentError, "you must provide :get_key")
-
-  defp check_nonce_type_option(params = %{encrypt?: true}) do
-    Logger.warning("option `:encrypt?` is deprecated, use `nonce_type: :encrypted` instead")
-    params |> Map.put(:nonce_type, :encrypted) |> check_nonce_type_option()
-  end
 
   defp check_nonce_type_option(params), do: params
 

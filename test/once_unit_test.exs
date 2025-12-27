@@ -60,23 +60,6 @@ defmodule OnceUnitTest do
   end
 
   describe "init/1" do
-    @tag :capture_log
-    test "requires get_key if :encrypt? == true" do
-      assert_raise ArgumentError, "you must provide :get_key", fn ->
-        Once.init(encrypt?: true)
-      end
-    end
-
-    test "logs deprecation warning for encrypt?" do
-      {_, log} =
-        ExUnit.CaptureLog.with_log(fn ->
-          Once.init(encrypt?: true, get_key: fn -> :crypto.strong_rand_bytes(24) end)
-        end)
-
-      assert log =~
-               "[warning] option `:encrypt?` is deprecated, use `nonce_type: :encrypted` instead"
-    end
-
     test "requires get_key if :type == :encrypted" do
       assert_raise ArgumentError, "you must provide :get_key", fn ->
         Once.init(nonce_type: :encrypted)
