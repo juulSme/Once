@@ -60,12 +60,6 @@ defmodule OnceUnitTest do
   end
 
   describe "init/1" do
-    test "requires get_key if :type == :encrypted" do
-      assert_raise ArgumentError, "you must provide :get_key", fn ->
-        Once.init(nonce_type: :encrypted)
-      end
-    end
-
     test "sets defaults" do
       assert %{
                db_format: :signed,
@@ -78,6 +72,24 @@ defmodule OnceUnitTest do
     test "overrides defaults" do
       assert %{db_format: :url64, ex_format: :signed} =
                Once.init(db_format: :url64, ex_format: :signed)
+    end
+
+    test "validates options" do
+      assert_raise ArgumentError, "option :no_noncense is invalid: \"boom\"", fn ->
+        Once.init(no_noncense: "boom")
+      end
+
+      assert_raise ArgumentError, "option :ex_format is invalid: :invalid", fn ->
+        Once.init(ex_format: :invalid)
+      end
+
+      assert_raise ArgumentError, "option :db_format is invalid: :invalid", fn ->
+        Once.init(db_format: :invalid)
+      end
+
+      assert_raise ArgumentError, "option :nonce_type is invalid: :invalid", fn ->
+        Once.init(nonce_type: :invalid)
+      end
     end
   end
 
@@ -108,7 +120,7 @@ defmodule OnceUnitTest do
     end
 
     test "generates encrypted nonces in configured format" do
-      params = Once.init(nonce_type: :encrypted, get_key: fn -> :crypto.strong_rand_bytes(24) end)
+      params = Once.init(nonce_type: :encrypted)
 
       assert <<_::64>> = Map.put(params, :ex_format, :raw) |> Once.autogenerate()
       assert <<_::88>> = Map.put(params, :ex_format, :url64) |> Once.autogenerate()
@@ -117,12 +129,7 @@ defmodule OnceUnitTest do
     end
 
     test "generates encrypted nonces" do
-      params =
-        Once.init(
-          nonce_type: :encrypted,
-          get_key: fn -> :crypto.strong_rand_bytes(24) end,
-          ex_format: :raw
-        )
+      params = Once.init(nonce_type: :encrypted, ex_format: :raw)
 
       assert <<prefix1::42, _::22>> = Once.autogenerate(params)
       assert <<prefix2::42, _::22>> = Once.autogenerate(params)

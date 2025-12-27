@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2025-12-31
+
+- Upgrade to NoNoncense >= 1.0, which has breaking changes. Be sure to read its [migration guide](https://hexdocs.pm/no_noncense/migration.html).
+  - Hard deprecate options `:encrypt?` and `:get_key` (the NoNoncense encryption key is now passed to its `init/1` function)
+
 ## [0.1.0] - 2025-12-09
 
 - Use Elixir 1.19 features when possible (`Base.valid64?/2`)

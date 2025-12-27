@@ -23,7 +23,7 @@ defmodule Once.MixProject do
       name: "Once",
       docs: [
         source_ref: ~s(main),
-        extras: ~w(./README.md ./LICENSE.md ./CHANGELOG.md),
+        extras: ~w(./README.md ./LICENSE.md ./CHANGELOG.md ./MIGRATION.md),
         main: "Once",
         skip_undefined_reference_warnings_on: ~w(),
         filter_modules: ~r(^Elixir\.Once\.?.*)
@@ -43,7 +43,7 @@ defmodule Once.MixProject do
     [
       {:ex_doc, "~> 0.36", only: [:dev, :test], runtime: false},
       {:benchee, "~> 1.0", only: [:dev], runtime: false},
-      {:no_noncense, "~> 0.0.3"},
+      {:no_noncense, "~> 1.0"},
       {:ecto, "~> 3.0"},
       {:mix_test_watch, "~> 1.2", only: [:dev], runtime: false},
       {:ecto_sql, "~> 3.4", only: [:dev, :test]},
