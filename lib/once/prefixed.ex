@@ -1,79 +1,89 @@
 defmodule Once.Prefixed do
+  @moduledoc """
+  A Once with a prefix, for example "prfx_AV7m9gAAAAU". The prefix is not persisted and only exists in Elixir, so that the stored ID size is still 64 bits and can still be an integer.
+
+
+  """
   use Ecto.ParameterizedType
   import Once.Shared
 
-  @type format :: :url64 | :hex
-
-  @type opts :: [
-          prefix: binary(),
-          no_noncense: module(),
-          format: format(),
-          get_key: (-> <<_::24>>),
-          nonce_type: Once.nonce_type()
-        ]
-
-  @default_opts %{no_noncense: Once, nonce_type: :counter, format: :url64}
+  @type opt :: {:prefix, binary()}
+  @type opts :: [Once.opt() | opt()]
 
   #######################
   # Type implementation #
   #######################
 
   @impl true
-  def type(_), do: :string
+  defdelegate type(params), to: Once
 
   @impl true
-  @spec init(opts()) :: map()
-  def init(opts \\ []) do
-    opts |> Enum.into(@default_opts) |> Once.check_nonce_type_option() |> require_prefix()
-  end
+  def init(opts \\ []), do: opts |> Once.init() |> require_prefix()
 
   @impl true
   def cast(nil, _), do: {:ok, nil}
-  def cast(value, params), do: match_prefix(value, params)
+
+  def cast(value, params) do
+    case defix(value, params.prefix) do
+      {:ok, value} -> Once.cast(value, params)
+      error -> error
+    end
+  end
 
   @impl true
   def load(nil, _, _), do: {:ok, nil}
-  def load(value, _, params), do: match_prefix(value, params)
+
+  def load(value, _, params) do
+    case Once.load(value, nil, params) do
+      {:ok, value} -> prefix(value, params.prefix)
+      error -> error
+    end
+  end
 
   @impl true
   def dump(nil, _, _), do: {:ok, nil}
-  def dump(value, _, params), do: match_prefix(value, params)
+
+  def dump(value, _, params) do
+    case defix(value, params.prefix) do
+      {:ok, value} -> Once.dump(value, nil, params)
+      error -> error
+    end
+  end
 
   @impl true
-  def autogenerate(params = %{nonce_type: :counter}) do
-    NoNoncense.nonce(params.no_noncense, 64)
-    |> to_format(params.format)
-    |> prefix(params.prefix)
+  def autogenerate(params), do: params |> Once.autogenerate() |> prefix(params.prefix)
+
+  def to_format(value, format, opts \\ []) do
+    with prefix <- Keyword.fetch!(opts, :prefix),
+         {:ok, defixed} <- defix(value, prefix),
+         {:ok, converted} <- Once.to_format(defixed, format, opts) do
+      {:ok, prefix(converted, prefix)}
+    else
+      _ -> :error
+    end
   end
 
-  def autogenerate(params = %{nonce_type: :sortable}) do
-    NoNoncense.sortable_nonce(params.no_noncense, 64)
-    |> to_format(params.format)
-    |> prefix(params.prefix)
-  end
-
-  def autogenerate(params) do
-    NoNoncense.encrypted_nonce(params.no_noncense, 64, params.get_key.())
-    |> to_format(params.format)
-    |> prefix(params.prefix)
+  def to_format!(value, format, opts \\ []) do
+    to_format(value, format, opts) |> do_to_format!(value)
   end
 
   ###########
   # Private #
   ###########
 
-  defp match_prefix(value, %{prefix: prefix}) do
-    case value do
-      <<^prefix::binary, _::binary>> -> {:ok, value}
-      _ -> :error
-    end
+  defp prefix(nonce, prefix) when is_integer(nonce) do
+    <<prefix::binary, Integer.to_string(nonce)::binary>>
   end
 
   defp prefix(nonce, prefix), do: <<prefix::binary, nonce::binary>>
 
-  defp to_format(value, :url64), do: encode64(value)
-  defp to_format(value, :hex), do: encode16(value)
+  defp defix(prefixed, prefix) do
+    case prefixed do
+      ^prefix <> value -> {:ok, value}
+      _ -> :error
+    end
+  end
 
   defp require_prefix(params) when is_binary(params.prefix), do: params
-  defp require_prefix(_), do: raise(ArgumentError, "prefix required")
+  defp require_prefix(_), do: raise(ArgumentError, "you must provide :prefix")
 end

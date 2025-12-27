@@ -3,3 +3,6 @@ NoNoncense.init(name: Once, machine_id: 0)
 
 alias MyApp.{MysqlRepo, PgRepo, Schema}
 import Ecto.Query
+alias Once.{Prefixed}
+
+prefix_opts = Prefixed.init(prefix: "prfx_")
