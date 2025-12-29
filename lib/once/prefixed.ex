@@ -7,8 +7,10 @@ defmodule Once.Prefixed do
   use Ecto.ParameterizedType
   import Once.Shared
 
-  @type opt :: {:prefix, binary()}
-  @type opts :: [Once.opt() | opt()]
+  @type opt :: Once.opt() | {:prefix, binary()} | {:persist_prefix, boolean()}
+  @type opts :: [opt()]
+
+  @default_opts %{persist_prefix: false}
 
   #######################
   # Type implementation #
@@ -18,34 +20,47 @@ defmodule Once.Prefixed do
   defdelegate type(params), to: Once
 
   @impl true
-  def init(opts \\ []), do: opts |> Once.init() |> require_prefix()
+  def init(opts \\ []) do
+    opts = opts |> Once.init() |> Enum.into(@default_opts)
+
+    if not is_binary(opts[:prefix]) do
+      raise ArgumentError, "option :prefix is required"
+    end
+
+    if opts.persist_prefix and opts.db_format in [:signed, :unsigned] do
+      raise ArgumentError, "option :persist_prefix requires db_format :raw, :hex or :url64"
+    end
+
+    opts
+  end
 
   @impl true
   def cast(nil, _), do: {:ok, nil}
 
-  def cast(value, params) do
-    case defix(value, params.prefix) do
-      {:ok, value} -> Once.cast(value, params)
-      error -> error
+  def cast(value, params = %{prefix: prefix}) do
+    with {:ok, stripped} <- strip(value, prefix),
+         {:ok, casted} <- Once.cast(stripped, params) do
+      prefixed = if stripped == casted, do: value, else: prefix(casted, prefix)
+      {:ok, prefixed}
     end
   end
 
   @impl true
   def load(nil, _, _), do: {:ok, nil}
 
-  def load(value, _, params) do
-    case Once.load(value, nil, params) do
-      {:ok, value} -> prefix(value, params.prefix)
-      error -> error
+  def load(value, _, params = %{prefix: prefix}) do
+    with {:ok, stripped} <- maybe_strip(value, prefix, params),
+         {:ok, loaded} <- Once.load(stripped, nil, params) do
+      {:ok, prefix(loaded, prefix)}
     end
   end
 
   @impl true
   def dump(nil, _, _), do: {:ok, nil}
 
-  def dump(value, _, params) do
-    case defix(value, params.prefix) do
-      {:ok, value} -> Once.dump(value, nil, params)
+  def dump(value, _, params = %{prefix: prefix}) do
+    case strip(value, prefix) do
+      {:ok, value} -> Once.dump(value, nil, params) |> maybe_prefix(prefix, params)
       error -> error
     end
   end
@@ -53,37 +68,42 @@ defmodule Once.Prefixed do
   @impl true
   def autogenerate(params), do: params |> Once.autogenerate() |> prefix(params.prefix)
 
-  def to_format(value, format, opts \\ []) do
-    with prefix <- Keyword.fetch!(opts, :prefix),
-         {:ok, defixed} <- defix(value, prefix),
-         {:ok, converted} <- Once.to_format(defixed, format, opts) do
-      {:ok, prefix(converted, prefix)}
+  def to_format(value, prefix, format, opts \\ []) do
+    with {:ok, stripped} <- strip(value, prefix),
+         {:ok, converted} <- Once.to_format(stripped, format, opts) do
+      prefixed = if stripped == converted, do: value, else: prefix(converted, prefix)
+      {:ok, prefixed}
     else
       _ -> :error
     end
   end
 
-  def to_format!(value, format, opts \\ []) do
-    to_format(value, format, opts) |> do_to_format!(value)
+  def to_format!(value, prefix, format, opts \\ []) do
+    to_format(value, prefix, format, opts) |> do_to_format!(value)
   end
 
   ###########
   # Private #
   ###########
 
-  defp prefix(nonce, prefix) when is_integer(nonce) do
-    <<prefix::binary, Integer.to_string(nonce)::binary>>
-  end
+  defp prefix(nonce, prefix) when is_binary(nonce), do: <<prefix::binary, nonce::binary>>
+  defp prefix(nonce, prefix), do: nonce |> Integer.to_string() |> prefix(prefix)
 
-  defp prefix(nonce, prefix), do: <<prefix::binary, nonce::binary>>
+  # defp prefix(original, stripped, casted, prefix)
+  # defp prefix(original, stripped, casted, _) when stripped == casted, do: original
+  # defp prefix(_, _stripped, casted, prefix), do: prefix(casted, prefix)
 
-  defp defix(prefixed, prefix) do
+  defp maybe_prefix(<<nonce::binary>>, prefix, %{persist_prefix: true}), do: prefix(nonce, prefix)
+  defp maybe_prefix({:ok, nonce}, prefix, params), do: {:ok, maybe_prefix(nonce, prefix, params)}
+  defp maybe_prefix(nonce, _, _), do: nonce
+
+  defp strip(prefixed, prefix) do
     case prefixed do
       ^prefix <> value -> {:ok, value}
       _ -> :error
     end
   end
 
-  defp require_prefix(params) when is_binary(params.prefix), do: params
-  defp require_prefix(_), do: raise(ArgumentError, "you must provide :prefix")
+  defp maybe_strip(<<nonce::binary>>, prefix, %{persist_prefix: true}), do: strip(nonce, prefix)
+  defp maybe_strip(nonce, _, _), do: {:ok, nonce}
 end

@@ -59,9 +59,9 @@ defmodule Once.PrefixedUnitTest do
         {format_out, output} <- formats_values,
         input != :error and not (format_in == :invalid and format_out == :invalid) do
       test "should map [#{format_in}: #{inspect(input)}] to [#{format_out}: #{inspect(output)}]" do
-        opts = [prefix: "t_", parse_int: unquote(format_in) in [:signed, :unsigned]]
+        opts = [parse_int: unquote(format_in) in [:signed, :unsigned]]
 
-        case Prefixed.to_format(unquote(input), unquote(format_out), opts) do
+        case Prefixed.to_format(unquote(input), "t_", unquote(format_out), opts) do
           {:ok, result} -> result
           result -> result
         end
@@ -72,7 +72,7 @@ defmodule Once.PrefixedUnitTest do
 
   describe "init/1" do
     test "requires :prefix" do
-      assert_raise ArgumentError, "you must provide :prefix", fn ->
+      assert_raise ArgumentError, "option :prefix is required", fn ->
         Prefixed.init()
       end
     end
@@ -83,7 +83,8 @@ defmodule Once.PrefixedUnitTest do
                nonce_type: :counter,
                ex_format: :url64,
                no_noncense: Once,
-               prefix: "t_"
+               prefix: "t_",
+               persist_prefix: false
              } == Prefixed.init(prefix: "t_")
     end
 
@@ -156,46 +157,43 @@ defmodule Once.PrefixedUnitTest do
     test "accepts and decodes url64-encoded when ex_format != int" do
       ambiguous = "t_12345678901"
       assert {:ok, raw} = Prefixed.cast(ambiguous, %{prefix: "t_", ex_format: :raw})
-      assert <<int::64>> = raw
-      assert to_string(int) != ambiguous
+      # "t_" prefix (<<116, 95>>) + 64-bit ID
+      assert <<116, 95, _::64>> = raw
     end
 
     test "accepts and decodes hex-encoded when ex_format != int" do
       ambiguous = "t_1234567890123456"
       assert {:ok, raw} = Prefixed.cast(ambiguous, %{prefix: "t_", ex_format: :raw})
-      assert <<int::64>> = raw
-      assert to_string(int) != ambiguous
+      # "t_" prefix + 64-bit ID
+      assert <<116, 95, _::64>> = raw
     end
 
     test "accepts and decodes raw when ex_format != int" do
       ambiguous = "t_12345678"
       assert {:ok, raw} = Prefixed.cast(ambiguous, %{prefix: "t_", ex_format: :raw})
-      assert <<int::64>> = raw
-      assert to_string(int) != ambiguous
+      # "t_" prefix + 64-bit ID
+      assert <<116, 95, _::64>> = raw
     end
 
     test "accepts and decodes url64-encoded when ex_format == int" do
       ambiguous_int = 12_345_678_901
       ambiguous = "t_#{ambiguous_int}"
 
-      assert {:ok, ambiguous_int} ==
-               Prefixed.cast("#{ambiguous}", %{prefix: "t_", ex_format: :unsigned})
+      assert {:ok, ambiguous} == Prefixed.cast(ambiguous, %{prefix: "t_", ex_format: :signed})
     end
 
     test "accepts and decodes hex-encoded when ex_format == int" do
       ambiguous_int = 1_234_567_890_123_456
       ambiguous = "t_#{ambiguous_int}"
 
-      assert {:ok, ambiguous_int} ==
-               Prefixed.cast("#{ambiguous}", %{prefix: "t_", ex_format: :signed})
+      assert {:ok, ambiguous} == Prefixed.cast(ambiguous, %{prefix: "t_", ex_format: :unsigned})
     end
 
     test "accepts and decodes raw when ex_format == int" do
       ambiguous_int = 12_345_678
       ambiguous = "t_#{ambiguous_int}"
 
-      assert {:ok, ambiguous_int} ==
-               Prefixed.cast("#{ambiguous}", %{prefix: "t_", ex_format: :unsigned})
+      assert {:ok, ambiguous} == Prefixed.cast(ambiguous, %{prefix: "t_", ex_format: :signed})
     end
   end
 
@@ -264,6 +262,139 @@ defmodule Once.PrefixedUnitTest do
                  ex_format: :unsigned,
                  db_format: :signed
                })
+    end
+  end
+
+  describe "persist_prefix option" do
+    test "validates db_format compatibility when persist_prefix is true" do
+      assert_raise ArgumentError,
+                   "option :persist_prefix requires db_format :raw, :hex or :url64",
+                   fn ->
+                     Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :signed)
+                   end
+
+      assert_raise ArgumentError,
+                   "option :persist_prefix requires db_format :raw, :hex or :url64",
+                   fn ->
+                     Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :unsigned)
+                   end
+    end
+
+    test "allows compatible db_formats when persist_prefix is true" do
+      assert %{persist_prefix: true, db_format: :url64} =
+               Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :url64)
+
+      assert %{persist_prefix: true, db_format: :hex} =
+               Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :hex)
+
+      assert %{persist_prefix: true, db_format: :raw} =
+               Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :raw)
+    end
+
+    test "dump preserves prefix when persist_prefix is true" do
+      params = Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :url64)
+      id = Prefixed.autogenerate(params)
+
+      assert {:ok, dumped} = Prefixed.dump(id, nil, params)
+      assert String.starts_with?(dumped, "t_")
+      assert dumped == id
+    end
+
+    test "dump strips prefix when persist_prefix is false" do
+      params = Prefixed.init(prefix: "t_", persist_prefix: false, db_format: :url64)
+      id = Prefixed.autogenerate(params)
+
+      assert {:ok, dumped} = Prefixed.dump(id, nil, params)
+      refute String.starts_with?(dumped, "t_")
+      assert dumped != id
+    end
+
+    test "load handles prefixed values when persist_prefix is true" do
+      params =
+        Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :url64, ex_format: :url64)
+
+      id = Prefixed.autogenerate(params)
+
+      {:ok, dumped} = Prefixed.dump(id, nil, params)
+      assert {:ok, loaded} = Prefixed.load(dumped, nil, params)
+      assert loaded == id
+      assert String.starts_with?(loaded, "t_")
+    end
+
+    test "load adds prefix when persist_prefix is false" do
+      params =
+        Prefixed.init(prefix: "t_", persist_prefix: false, db_format: :url64, ex_format: :url64)
+
+      id = Prefixed.autogenerate(params)
+
+      {:ok, dumped} = Prefixed.dump(id, nil, params)
+      refute String.starts_with?(dumped, "t_")
+
+      assert {:ok, loaded} = Prefixed.load(dumped, nil, params)
+      assert loaded == id
+      assert String.starts_with?(loaded, "t_")
+    end
+
+    test "round-trip with persist_prefix true for raw format" do
+      params = Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :raw, ex_format: :raw)
+      id = Prefixed.autogenerate(params)
+
+      {:ok, dumped} = Prefixed.dump(id, nil, params)
+      {:ok, loaded} = Prefixed.load(dumped, nil, params)
+
+      assert loaded == id
+      assert <<116, 95, _::64>> = loaded
+    end
+
+    test "round-trip with persist_prefix true for hex format" do
+      params = Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :hex, ex_format: :hex)
+      id = Prefixed.autogenerate(params)
+
+      {:ok, dumped} = Prefixed.dump(id, nil, params)
+      {:ok, loaded} = Prefixed.load(dumped, nil, params)
+
+      assert loaded == id
+      assert String.starts_with?(loaded, "t_")
+    end
+
+    test "load rejects values without prefix when persist_prefix is true" do
+      params = Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :url64)
+
+      assert :error = Prefixed.load("AAAAAAAAAAA", nil, params)
+    end
+
+    test "cast preserves prefix when persist_prefix is true" do
+      params =
+        Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :url64, ex_format: :url64)
+
+      assert {:ok, casted} = Prefixed.cast("t_AAAAAAAAAAA", params)
+      assert String.starts_with?(casted, "t_")
+      assert casted == "t_AAAAAAAAAAA"
+    end
+
+    test "cast rejects values without prefix when persist_prefix is true" do
+      params = Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :url64)
+
+      assert :error = Prefixed.cast("AAAAAAAAAAA", params)
+    end
+
+    test "cast returns prefixed value when persist_prefix is false" do
+      params =
+        Prefixed.init(prefix: "t_", persist_prefix: false, db_format: :signed, ex_format: :url64)
+
+      {:ok, casted} = Prefixed.cast("t_AAAAAAAAAAA", params)
+      # Cast adds prefix back, matching autogenerate and load behavior
+      assert String.starts_with?(casted, "t_")
+      assert casted == "t_AAAAAAAAAAA"
+    end
+
+    test "cast with format conversion when persist_prefix is true" do
+      params =
+        Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :url64, ex_format: :hex)
+
+      {:ok, casted} = Prefixed.cast("t_AAAAAAAAAAA", params)
+      assert String.starts_with?(casted, "t_")
+      assert casted == "t_0000000000000000"
     end
   end
 end
