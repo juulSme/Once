@@ -184,6 +184,7 @@ defmodule Once do
 
   @int_formats [:signed, :unsigned]
   @encoded_formats [:url64, :hex]
+  @formats [:raw] ++ @int_formats ++ @encoded_formats
 
   #######################
   # Type implementation #
@@ -199,17 +200,29 @@ defmodule Once do
   def init(opts \\ []) do
     opts = Enum.into(opts, @default_opts)
 
-    if not is_atom(opts.no_noncense),
-      do: raise(ArgumentError, "option :no_noncense is invalid: #{inspect(opts.no_noncense)}")
+    if not is_atom(opts.no_noncense) do
+      raise ArgumentError, "option :no_noncense is invalid: #{inspect(opts.no_noncense)}"
+    end
 
-    if opts.ex_format not in [:url64, :raw, :signed, :unsigned, :hex],
-      do: raise(ArgumentError, "option :ex_format is invalid: #{inspect(opts.ex_format)}")
+    if opts.ex_format not in @formats do
+      raise ArgumentError, "option :ex_format is invalid: #{inspect(opts.ex_format)}"
+    end
 
-    if opts.db_format not in [:url64, :raw, :signed, :unsigned, :hex],
-      do: raise(ArgumentError, "option :db_format is invalid: #{inspect(opts.db_format)}")
+    if opts.db_format not in @formats do
+      raise ArgumentError, "option :db_format is invalid: #{inspect(opts.db_format)}"
+    end
 
-    if opts.nonce_type not in [:counter, :encrypted, :sortable],
-      do: raise(ArgumentError, "option :nonce_type is invalid: #{inspect(opts.nonce_type)}")
+    if opts.nonce_type not in [:counter, :encrypted, :sortable] do
+      raise ArgumentError, "option :nonce_type is invalid: #{inspect(opts.nonce_type)}"
+    end
+
+    if is_map_key(opts, :encrypt?) do
+      raise ArgumentError, "option :encrypt? is deprecated"
+    end
+
+    if is_map_key(opts, :get_key) do
+      raise ArgumentError, "option :get_key is deprecated"
+    end
 
     opts
   end
@@ -218,9 +231,9 @@ defmodule Once do
   def cast(nil, _), do: {:ok, nil}
 
   def cast(value, %{ex_format: ex_format}) when ex_format in @int_formats and is_binary(value) do
-    case Integer.parse(value) do
-      {parsed, _} -> convert_int(parsed, ex_format)
-      _ -> :error
+    case parse_int(value) do
+      :error = error -> error
+      int -> convert_int(int, ex_format)
     end
   end
 
@@ -234,9 +247,9 @@ defmodule Once do
   def dump(nil, _, _), do: {:ok, nil}
 
   def dump(value, _, params) when params.ex_format in @int_formats and is_binary(value) do
-    case Integer.parse(value) do
-      {parsed, _} -> maybe_convert(:int, parsed, params.db_format)
-      _ -> :error
+    case parse_int(value) do
+      :error = error -> error
+      int -> maybe_convert(:int, int, params.db_format)
     end
   end
 
@@ -413,13 +426,14 @@ defmodule Once do
   defp from_raw(<<int::signed-64>>, :signed), do: int
   defp from_raw(<<int::unsigned-64>>, :unsigned), do: int
 
-  defp maybe_parse_int(value, true) when is_binary(value) do
+  defp maybe_parse_int(value, true) when is_binary(value), do: parse_int(value)
+  defp maybe_parse_int(value, _), do: value
+
+  defp parse_int(value) do
     try do
       String.to_integer(value)
     rescue
       _ -> :error
     end
   end
-
-  defp maybe_parse_int(value, _), do: value
 end

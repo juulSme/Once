@@ -90,6 +90,14 @@ defmodule OnceUnitTest do
       assert_raise ArgumentError, "option :nonce_type is invalid: :invalid", fn ->
         Once.init(nonce_type: :invalid)
       end
+
+      assert_raise ArgumentError, "option :encrypt? is deprecated", fn ->
+        Once.init(encrypt?: true)
+      end
+
+      assert_raise ArgumentError, "option :get_key is deprecated", fn ->
+        Once.init(get_key: fn -> "key" end)
+      end
     end
   end
 
@@ -182,6 +190,11 @@ defmodule OnceUnitTest do
       ambiguous = 12_345_678
       assert {:ok, ambiguous} == Once.cast("#{ambiguous}", %{ex_format: :unsigned})
     end
+
+    test "rejects floats" do
+      assert :error == Once.cast("1.2", %{ex_format: :unsigned})
+      assert :error == Once.cast("1.0", %{ex_format: :unsigned})
+    end
   end
 
   describe "dump/3" do
@@ -225,6 +238,11 @@ defmodule OnceUnitTest do
 
       assert {:ok, ambiguous} ==
                Once.dump("#{ambiguous}", nil, %{ex_format: :unsigned, db_format: :signed})
+    end
+
+    test "rejects floats" do
+      assert :error == Once.dump("1.2", nil, %{ex_format: :unsigned})
+      assert :error == Once.dump("1.0", nil, %{ex_format: :unsigned})
     end
   end
 end
