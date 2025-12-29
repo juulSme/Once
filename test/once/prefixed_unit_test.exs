@@ -77,6 +77,38 @@ defmodule Once.PrefixedUnitTest do
       end
     end
 
+    test "rejects empty string prefix" do
+      assert_raise ArgumentError, "option :prefix is required", fn ->
+        Prefixed.init(prefix: "")
+      end
+    end
+
+    test "rejects non-binary prefix" do
+      assert_raise ArgumentError, "option :prefix is required", fn ->
+        Prefixed.init(prefix: :atom)
+      end
+    end
+
+    test "accepts unicode prefix" do
+      assert %{prefix: "🔥_"} = Prefixed.init(prefix: "🔥_")
+    end
+
+    test "accepts prefix with special characters" do
+      assert %{prefix: "user-id_"} = Prefixed.init(prefix: "user-id_")
+      assert %{prefix: "usr.id_"} = Prefixed.init(prefix: "usr.id_")
+      assert %{prefix: "usr id_"} = Prefixed.init(prefix: "usr id_")
+    end
+
+    test "accepts very long prefix" do
+      long_prefix = String.duplicate("x", 100) <> "_"
+      assert %{prefix: ^long_prefix} = Prefixed.init(prefix: long_prefix)
+    end
+
+    test "accepts prefix that resembles encoded data" do
+      assert %{prefix: "AAAA_"} = Prefixed.init(prefix: "AAAA_")
+      assert %{prefix: "f00d_"} = Prefixed.init(prefix: "f00d_")
+    end
+
     test "sets defaults" do
       assert %{
                db_format: :signed,
@@ -195,6 +227,33 @@ defmodule Once.PrefixedUnitTest do
 
       assert {:ok, ambiguous} == Prefixed.cast(ambiguous, %{prefix: "t_", ex_format: :signed})
     end
+
+    test "rejects unprefixed value" do
+      assert :error = Prefixed.cast("AAAAAAAAAAA", %{prefix: "t_", ex_format: :url64})
+      assert :error = Prefixed.cast("123", %{prefix: "t_", ex_format: :signed})
+    end
+
+    test "rejects wrong prefix" do
+      assert :error = Prefixed.cast("wrong_AAAAAAAAAAA", %{prefix: "t_", ex_format: :url64})
+      assert :error = Prefixed.cast("usr_AAAAAAAAAAA", %{prefix: "prod_", ex_format: :url64})
+    end
+
+    test "works with unicode prefix" do
+      params = %{prefix: "🔥_", ex_format: :url64}
+      assert {:ok, "🔥_AAAAAAAAAAA"} = Prefixed.cast("🔥_AAAAAAAAAAA", params)
+    end
+
+    test "works with special character prefix" do
+      params = %{prefix: "user-id_", ex_format: :url64}
+      assert {:ok, "user-id_AAAAAAAAAAA"} = Prefixed.cast("user-id_AAAAAAAAAAA", params)
+    end
+
+    test "works with very long prefix" do
+      long_prefix = String.duplicate("x", 100) <> "_"
+      params = %{prefix: long_prefix, ex_format: :url64}
+      value = long_prefix <> "AAAAAAAAAAA"
+      assert {:ok, ^value} = Prefixed.cast(value, params)
+    end
   end
 
   describe "dump/3" do
@@ -260,6 +319,34 @@ defmodule Once.PrefixedUnitTest do
                Prefixed.dump("#{ambiguous}", nil, %{
                  prefix: "t_",
                  ex_format: :unsigned,
+                 db_format: :signed
+               })
+    end
+
+    test "rejects unprefixed value" do
+      assert :error =
+               Prefixed.dump("AAAAAAAAAAA", nil, %{
+                 prefix: "t_",
+                 ex_format: :url64,
+                 db_format: :signed
+               })
+
+      assert :error =
+               Prefixed.dump("123", nil, %{prefix: "t_", ex_format: :signed, db_format: :signed})
+    end
+
+    test "rejects wrong prefix" do
+      assert :error =
+               Prefixed.dump("wrong_AAAAAAAAAAA", nil, %{
+                 prefix: "t_",
+                 ex_format: :url64,
+                 db_format: :signed
+               })
+
+      assert :error =
+               Prefixed.dump("usr_AAAAAAAAAAA", nil, %{
+                 prefix: "prod_",
+                 ex_format: :url64,
                  db_format: :signed
                })
     end
@@ -395,6 +482,54 @@ defmodule Once.PrefixedUnitTest do
       {:ok, casted} = Prefixed.cast("t_AAAAAAAAAAA", params)
       assert String.starts_with?(casted, "t_")
       assert casted == "t_0000000000000000"
+    end
+  end
+
+  describe "to_format!/4" do
+    test "raises on invalid input" do
+      assert_raise ArgumentError, ~r/value could not be parsed/, fn ->
+        Prefixed.to_format!("invalid", "t_", :signed)
+      end
+    end
+
+    test "raises on wrong prefix" do
+      assert_raise ArgumentError, ~r/value could not be parsed/, fn ->
+        Prefixed.to_format!("wrong_AAAAAAAAAAA", "t_", :signed)
+      end
+    end
+
+    test "raises on unprefixed value" do
+      assert_raise ArgumentError, ~r/value could not be parsed/, fn ->
+        Prefixed.to_format!("AAAAAAAAAAA", "t_", :signed)
+      end
+    end
+
+    test "successfully converts valid prefixed values" do
+      assert "t_0000000000000000" = Prefixed.to_format!("t_AAAAAAAAAAA", "t_", :hex)
+    end
+  end
+
+  describe "load with corrupt data" do
+    test "rejects corrupt prefixed data when persist_prefix is true" do
+      params = Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :url64)
+
+      # Invalid url64 after prefix
+      assert :error = Prefixed.load("t_!!invalid!!", nil, params)
+
+      # Truncated data after prefix
+      assert :error = Prefixed.load("t_AA", nil, params)
+    end
+
+    test "rejects data with wrong prefix when persist_prefix is true" do
+      params = Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :url64)
+
+      assert :error = Prefixed.load("wrong_AAAAAAAAAAA", nil, params)
+    end
+
+    test "rejects unprefixed data when persist_prefix is true" do
+      params = Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :url64)
+
+      assert :error = Prefixed.load("AAAAAAAAAAA", nil, params)
     end
   end
 end

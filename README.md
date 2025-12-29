@@ -53,3 +53,15 @@ end
 ```
 
 And that's it! Be sure to look at [hexdocs.pm](https://hexdocs.pm/once/) for options and additional info.
+
+## Prefixed IDs
+
+For Stripe-style prefixed IDs like `"usr_AV7m9gAAAAU"`, use `Once.Prefixed`:
+
+```elixir
+schema "users" do
+  field :id, Once.Prefixed, prefix: "usr_", autogenerate: true
+end
+```
+
+See the [Once.Prefixed documentation](https://hexdocs.pm/once/Once.Prefixed.html) for details.

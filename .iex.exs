@@ -5,4 +5,5 @@ alias MyApp.{MysqlRepo, PgRepo, Schema}
 import Ecto.Query
 alias Once.{Prefixed}
 
+opts = Once.init()
 prefix_opts = Prefixed.init(prefix: "prfx_")

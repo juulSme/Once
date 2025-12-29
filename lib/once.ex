@@ -50,6 +50,10 @@ defmodule Once do
 
   And that's it!
 
+  ## Prefixed IDs
+
+  For Stripe-style prefixed IDs like `"usr_AV7m9gAAAAU"`, see `Once.Prefixed`. Prefixes make IDs self-documenting and easier to work with in APIs and logs.
+
   ## Options
 
   The Ecto type takes a few optional parameters:
@@ -272,6 +276,9 @@ defmodule Once do
   @to_format_opts_docs """
   - `:parse_int` parse numeric strings like `"123"`. Will give unexpected results with all-int hex/url64 inputs.
   """
+
+  @doc false
+  def to_format_opts_docs, do: @to_format_opts_docs
 
   @type to_format_opt :: {:parse_int, boolean()}
 
