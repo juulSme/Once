@@ -3,7 +3,7 @@ defmodule Once.Prefixed do
   - `:prefix` (required) the string prefix to prepend to IDs, for example `"usr_"` or `"prod_"`
   - `:persist_prefix` whether to store the prefix in the database (default `false`). When `true`, requires `:db_format` to be `:raw`, `:hex`, or `:url64`
 
-  All `Once` options are also supported. See `Once` for details.
+  All `Once` options are also supported. See `t:Once.init_opt/0` for details.
   """
 
   @moduledoc """
@@ -70,12 +70,11 @@ defmodule Once.Prefixed do
   import Once.Shared
 
   @typedoc """
-  Additional options specific to `Once.Prefixed`.
+  Options to initialize `Once.Prefixed`.
 
   #{@options_docs}
   """
-  @type opt :: Once.opt() | {:prefix, binary()} | {:persist_prefix, boolean()}
-  @type opts :: [opt()]
+  @type init_opt :: Once.init_opt() | {:prefix, binary()} | {:persist_prefix, boolean()}
 
   @default_opts %{persist_prefix: false}
 
@@ -87,6 +86,7 @@ defmodule Once.Prefixed do
   defdelegate type(params), to: Once
 
   @impl true
+  @spec init([init_opt()]) :: map()
   def init(opts \\ []) do
     opts = opts |> Once.init() |> Enum.into(@default_opts)
 
@@ -167,7 +167,7 @@ defmodule Once.Prefixed do
       iex> Prefixed.to_format("AAAAAAAAAAA", "usr_", :unsigned)
       :error
   """
-  @spec to_format(binary(), binary(), Once.format(), Once.to_format_opts()) ::
+  @spec to_format(binary(), binary(), Once.format(), [Once.to_format_opt()]) ::
           {:ok, binary()} | :error
   def to_format(value, prefix, format, opts \\ []) do
     with {:ok, stripped} <- strip(value, prefix),
@@ -199,7 +199,7 @@ defmodule Once.Prefixed do
       iex> Prefixed.to_format!("AAAAAAAAAAA", "usr_", :signed)
       ** (ArgumentError) value could not be parsed: "AAAAAAAAAAA"
   """
-  @spec to_format!(binary(), binary(), Once.format(), Once.to_format_opts()) :: binary()
+  @spec to_format!(binary(), binary(), Once.format(), [Once.to_format_opt()]) :: binary()
   def to_format!(value, prefix, format, opts \\ []) do
     to_format(value, prefix, format, opts) |> do_to_format!(value)
   end

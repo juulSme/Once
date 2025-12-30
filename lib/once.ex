@@ -21,6 +21,8 @@ defmodule Once do
   - [encrypted](#module-encrypted-ids): unique and unpredictable, like a UUIDv4 but shorter
   - sortable: time-sortable like a [Snowflake ID](https://en.wikipedia.org/wiki/Snowflake_ID)
 
+  For prefixed IDs like `"usr_AV7m9gAAAAU"`, see `Once.Prefixed`.
+
   > #### Read the migration guide {: .warning}
   >
   > If you're upgrading from v0.x.x and you use encrypted IDs, please read the [Migration Guide](MIGRATION.md) carefully - there are breaking changes that require attention to preserve uniqueness guarantees.
@@ -48,10 +50,6 @@ defmodule Once do
       end
 
   And that's it!
-
-  ## Prefixed IDs
-
-  For Stripe-style prefixed IDs like `"usr_AV7m9gAAAAU"`, see `Once.Prefixed`. Prefixes make IDs self-documenting and easier to work with in APIs and logs.
 
   ## Options
 
@@ -123,7 +121,7 @@ defmodule Once do
       # signed ints (natural signed integer order where unsigned-max is equivalent to signed-min)
       [-9223372036854775808, 0, 1, 9223372036854775807]
 
-  If you want to rely on Once IDs for chronological sorting (especially with sortable nonces), choose formats that preserve unsigned integer ordering. This means using `:unsigned`, `:raw`, `:hex`, `hex32`.
+  If you want to rely on Once IDs for chronological sorting (especially with sortable nonces), choose formats that preserve unsigned integer ordering. This means using `:unsigned`, `:raw`, `:hex` or `hex32`.
 
   Avoid `:url64` for sorting; its alphabet wasn't designed with lexicographic ordering in mind, making it unsuitable. Signed integers only preserve the order in their positive range.
 
@@ -168,18 +166,11 @@ defmodule Once do
 
   #{@options_docs}
   """
-  @type opt ::
+  @type init_opt ::
           {:no_noncense, module()}
           | {:ex_format, format()}
           | {:db_format, format()}
           | {:nonce_type, nonce_type()}
-
-  @typedoc """
-  Options to initialize `Once`.
-
-  #{@options_docs}
-  """
-  @type opts :: [opt()]
 
   @default_opts %{
     no_noncense: __MODULE__,
@@ -202,7 +193,7 @@ defmodule Once do
   def type(%{db_format: format}) when format in @int_formats, do: :integer
 
   @impl true
-  @spec init(opts()) :: map()
+  @spec init([init_opt()]) :: map()
   def init(opts \\ []) do
     opts = Enum.into(opts, @default_opts)
 
@@ -282,14 +273,12 @@ defmodule Once do
   @doc false
   def to_format_opts_docs, do: @to_format_opts_docs
 
-  @type to_format_opt :: {:parse_int, boolean()}
-
   @typedoc """
-  Options for `to_format/3`.
+  Options for `to_format/3`
 
   #{@to_format_opts_docs}
   """
-  @type to_format_opts :: [to_format_opt()]
+  @type to_format_opt :: {:parse_int, boolean()}
 
   @doc """
   Transform the different forms that a `Once` can take to one another.
@@ -336,7 +325,7 @@ defmodule Once do
       iex> Once.to_format("16145548770344536633", :hex, parse_int: true)
       {:ok, "e010831058218a39"}
   """
-  @spec to_format(binary() | integer(), format(), to_format_opts()) ::
+  @spec to_format(binary() | integer(), format(), [to_format_opt()]) ::
           {:ok, binary() | integer()} | :error
   def to_format(value, format, opts \\ []) do
     value = maybe_parse_int(value, opts[:parse_int])
@@ -359,7 +348,7 @@ defmodule Once do
       iex> Once.to_format!(Integer.pow(2, 64), :unsigned)
       ** (ArgumentError) value could not be parsed: 18446744073709551616
   """
-  @spec to_format!(binary() | integer(), format(), to_format_opts()) :: binary() | integer()
+  @spec to_format!(binary() | integer(), format(), [to_format_opt()]) :: binary() | integer()
   def to_format!(value, format, opts \\ []) do
     to_format(value, format, opts) |> do_to_format!(value)
   end
