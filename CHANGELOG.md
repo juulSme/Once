@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 - Upgrade to NoNoncense >= 1.0, which has breaking changes. Be sure to read its [migration guide](https://hexdocs.pm/no_noncense/migration.html).
   - Hard deprecate options `:encrypt?` and `:get_key` (the NoNoncense encryption key is now passed to its `init/1` function)
 - Add `Once.Prefixed` type for Stripe-style prefixed IDs (e.g., `"usr_AV7m9gAAAAU"`), with optional `:persist_prefix` to store prefix in database or strip it on storage
+- Add support for base32hex encoding as format `:hex32`
 - Require Elixir 1.16
 
 ## [0.1.0] - 2025-12-09

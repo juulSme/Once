@@ -6,44 +6,88 @@ defmodule OnceUnitTest do
   @signed_min -Integer.pow(2, 63)
   @signed_max Integer.pow(2, 63) - 1
   @unsigned_max @range - 1
-  @all_error Map.from_keys([:url64, :raw, :signed, :unsigned, :hex], :error)
 
   describe "to_format/3" do
     @format_tests [
-                    %{
-                      url64: "AAAAAAAAAAA",
-                      raw: <<0, 0, 0, 0, 0, 0, 0, 0>>,
-                      signed: 0,
-                      unsigned: 0,
-                      hex: "0000000000000000"
-                    },
-                    %{
-                      url64: "__________8",
-                      raw: <<255, 255, 255, 255, 255, 255, 255, 255>>,
-                      signed: -1,
-                      unsigned: @unsigned_max,
-                      hex: "ffffffffffffffff"
-                    },
-                    %{
-                      url64: "f_________8",
-                      raw: <<127, 255, 255, 255, 255, 255, 255, 255>>,
-                      signed: @signed_max,
-                      unsigned: @signed_max,
-                      hex: "7fffffffffffffff"
-                    },
-                    %{
-                      url64: "gAAAAAAAAAA",
-                      raw: <<128, 0, 0, 0, 0, 0, 0, 0>>,
-                      signed: @signed_min,
-                      unsigned: @signed_max + 1,
-                      hex: "8000000000000000"
-                    }
-                  ] ++
-                    Enum.map(
-                      # invalid inputs
-                      [@range, @signed_min - 1, "a", "++++++++++A", "XX12121212121212"],
-                      &Map.put(@all_error, :invalid, &1)
-                    )
+      %{
+        url64: "AAAAAAAAAAA",
+        raw: <<0, 0, 0, 0, 0, 0, 0, 0>>,
+        signed: 0,
+        unsigned: 0,
+        hex: "0000000000000000",
+        hex32: "0000000000000"
+      },
+      %{
+        url64: "__________8",
+        raw: <<255, 255, 255, 255, 255, 255, 255, 255>>,
+        signed: -1,
+        unsigned: @unsigned_max,
+        hex: "ffffffffffffffff",
+        hex32: "vvvvvvvvvvvvu"
+      },
+      %{
+        url64: "f_________8",
+        raw: <<127, 255, 255, 255, 255, 255, 255, 255>>,
+        signed: @signed_max,
+        unsigned: @signed_max,
+        hex: "7fffffffffffffff",
+        hex32: "fvvvvvvvvvvvu"
+      },
+      %{
+        url64: "gAAAAAAAAAA",
+        raw: <<128, 0, 0, 0, 0, 0, 0, 0>>,
+        signed: @signed_min,
+        unsigned: @signed_max + 1,
+        hex: "8000000000000000",
+        hex32: "g000000000000"
+      },
+      # invalid inputs
+      %{
+        invalid: @range,
+        url64: :error,
+        raw: :error,
+        signed: :error,
+        unsigned: :error,
+        hex: :error,
+        hex32: :error
+      },
+      %{
+        invalid: @signed_min - 1,
+        url64: :error,
+        raw: :error,
+        signed: :error,
+        unsigned: :error,
+        hex: :error,
+        hex32: :error
+      },
+      %{
+        invalid: "a",
+        url64: :error,
+        raw: :error,
+        signed: :error,
+        unsigned: :error,
+        hex: :error,
+        hex32: :error
+      },
+      %{
+        invalid: "++++++++++A",
+        url64: :error,
+        raw: :error,
+        signed: :error,
+        unsigned: :error,
+        hex: :error,
+        hex32: :error
+      },
+      %{
+        invalid: "XX12121212121212",
+        url64: :error,
+        raw: :error,
+        signed: :error,
+        unsigned: :error,
+        hex: :error,
+        hex32: :error
+      }
+    ]
 
     for formats_values <- @format_tests,
         {format_in, input} <- formats_values,
@@ -169,6 +213,13 @@ defmodule OnceUnitTest do
       assert to_string(int) != ambiguous
     end
 
+    test "accepts and decodes hex32-encoded when ex_format != int" do
+      ambiguous = "1234567890123"
+      assert {:ok, raw} = Once.cast(ambiguous, %{ex_format: :raw})
+      assert <<int::64>> = raw
+      assert to_string(int) != ambiguous
+    end
+
     test "accepts and decodes raw when ex_format != int" do
       ambiguous = "12345678"
       assert {:ok, raw} = Once.cast(ambiguous, %{ex_format: :raw})
@@ -183,6 +234,11 @@ defmodule OnceUnitTest do
 
     test "accepts and decodes hex-encoded when ex_format == int" do
       ambiguous = 1_234_567_890_123_456
+      assert {:ok, ambiguous} == Once.cast("#{ambiguous}", %{ex_format: :signed})
+    end
+
+    test "accepts and decodes hex32-encoded when ex_format == int" do
+      ambiguous = 1_234_567_890_123
       assert {:ok, ambiguous} == Once.cast("#{ambiguous}", %{ex_format: :signed})
     end
 
@@ -212,6 +268,13 @@ defmodule OnceUnitTest do
       assert to_string(int) != ambiguous
     end
 
+    test "accepts and decodes hex32-encoded when ex_format != int" do
+      ambiguous = "1234567890123"
+      assert {:ok, raw} = Once.dump(ambiguous, nil, %{ex_format: :hex32, db_format: :raw})
+      assert <<int::64>> = raw
+      assert to_string(int) != ambiguous
+    end
+
     test "accepts and decodes raw when ex_format != int" do
       ambiguous = "12345678"
       assert {:ok, raw} = Once.dump(ambiguous, nil, %{ex_format: :hex, db_format: :raw})
@@ -228,6 +291,13 @@ defmodule OnceUnitTest do
 
     test "accepts and decodes hex-encoded when ex_format == int" do
       ambiguous = 1_234_567_890_123_456
+
+      assert {:ok, ambiguous} ==
+               Once.dump("#{ambiguous}", nil, %{ex_format: :signed, db_format: :signed})
+    end
+
+    test "accepts and decodes hex32-encoded when ex_format == int" do
+      ambiguous = 1_234_567_890_123
 
       assert {:ok, ambiguous} ==
                Once.dump("#{ambiguous}", nil, %{ex_format: :signed, db_format: :signed})

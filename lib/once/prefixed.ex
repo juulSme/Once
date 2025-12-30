@@ -44,7 +44,7 @@ defmodule Once.Prefixed do
 
   > #### Prefix persistence requires string-compatible formats {: .warning}
   >
-  > When `persist_prefix: true`, you must use `:raw`, `:hex`, or `:url64` as `:db_format`. Integer formats (`:signed`, `:unsigned`) cannot store string prefixes.
+  > When `persist_prefix: true`, you must use `:raw`, `:hex`, `hex32` or `:url64` as `:db_format`. Integer formats (`:signed`, `:unsigned`) cannot store string prefixes.
 
   Note that values in your Elixir application **always have the prefix**, regardless of the `:persist_prefix` setting. Cast only accepts prefixed input - unprefixed values will be rejected.
 
@@ -95,7 +95,8 @@ defmodule Once.Prefixed do
     end
 
     if opts.persist_prefix and opts.db_format in [:signed, :unsigned] do
-      raise ArgumentError, "option :persist_prefix requires db_format :raw, :hex or :url64"
+      raise ArgumentError,
+            "option :persist_prefix requires db_format :raw, :hex, :hex32 or :url64"
     end
 
     opts
@@ -156,7 +157,9 @@ defmodule Once.Prefixed do
       {:ok, "prfx_18446744073709551615"}
       iex> Prefixed.to_format("prfx_18446744073709551615", "prfx_", :hex, parse_int: true)
       {:ok, "prfx_ffffffffffffffff"}
-      iex> Prefixed.to_format("prfx_ffffffffffffffff", "prfx_", :signed)
+      iex> Prefixed.to_format("prfx_ffffffffffffffff", "prfx_", :hex32)
+      {:ok, "prfx_vvvvvvvvvvvvu"}
+      iex> Prefixed.to_format("prfx_vvvvvvvvvvvvu", "prfx_", :signed)
       {:ok, "prfx_-1"}
 
       iex> Prefixed.to_format("wrong_AAAAAAAAAAA", "usr_", :unsigned)
@@ -186,6 +189,7 @@ defmodule Once.Prefixed do
       ...> |> Prefixed.to_format!("usr_", :hex, parse_int: true)
       ...> |> Prefixed.to_format!("usr_", :signed)
       ...> |> Prefixed.to_format!("usr_", :raw, parse_int: true)
+      ...> |> Prefixed.to_format!("usr_", :hex32)
       ...> |> Prefixed.to_format!("usr_", :url64)
       "usr_AAAAAAAAAAA"
 

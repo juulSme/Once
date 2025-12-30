@@ -16,28 +16,32 @@ defmodule Once.PrefixedUnitTest do
                       raw: "t_" <> <<0, 0, 0, 0, 0, 0, 0, 0>>,
                       signed: "t_#{0}",
                       unsigned: "t_#{0}",
-                      hex: "t_0000000000000000"
+                      hex: "t_0000000000000000",
+                      hex32: "t_0000000000000"
                     },
                     %{
                       url64: "t___________8",
                       raw: "t_" <> <<255, 255, 255, 255, 255, 255, 255, 255>>,
                       signed: "t_#{-1}",
                       unsigned: "t_#{@unsigned_max}",
-                      hex: "t_ffffffffffffffff"
+                      hex: "t_ffffffffffffffff",
+                      hex32: "t_vvvvvvvvvvvvu"
                     },
                     %{
                       url64: "t_f_________8",
                       raw: "t_" <> <<127, 255, 255, 255, 255, 255, 255, 255>>,
                       signed: "t_#{@signed_max}",
                       unsigned: "t_#{@signed_max}",
-                      hex: "t_7fffffffffffffff"
+                      hex: "t_7fffffffffffffff",
+                      hex32: "t_fvvvvvvvvvvvu"
                     },
                     %{
                       url64: "t_gAAAAAAAAAA",
                       raw: "t_" <> <<128, 0, 0, 0, 0, 0, 0, 0>>,
                       signed: "t_#{@signed_min}",
                       unsigned: "t_#{@signed_max + 1}",
-                      hex: "t_8000000000000000"
+                      hex: "t_8000000000000000",
+                      hex32: "t_g000000000000"
                     }
                   ] ++
                     Enum.map(
@@ -200,6 +204,13 @@ defmodule Once.PrefixedUnitTest do
       assert <<116, 95, _::64>> = raw
     end
 
+    test "accepts and decodes hex32-encoded when ex_format != int" do
+      ambiguous = "t_1234567890123"
+      assert {:ok, raw} = Prefixed.cast(ambiguous, %{prefix: "t_", ex_format: :raw})
+      # "t_" prefix + 64-bit ID
+      assert <<116, 95, _::64>> = raw
+    end
+
     test "accepts and decodes raw when ex_format != int" do
       ambiguous = "t_12345678"
       assert {:ok, raw} = Prefixed.cast(ambiguous, %{prefix: "t_", ex_format: :raw})
@@ -216,6 +227,13 @@ defmodule Once.PrefixedUnitTest do
 
     test "accepts and decodes hex-encoded when ex_format == int" do
       ambiguous_int = 1_234_567_890_123_456
+      ambiguous = "t_#{ambiguous_int}"
+
+      assert {:ok, ambiguous} == Prefixed.cast(ambiguous, %{prefix: "t_", ex_format: :unsigned})
+    end
+
+    test "accepts and decodes hex32-encoded when ex_format == int" do
+      ambiguous_int = 1_234_567_890_123
       ambiguous = "t_#{ambiguous_int}"
 
       assert {:ok, ambiguous} == Prefixed.cast(ambiguous, %{prefix: "t_", ex_format: :unsigned})
@@ -277,6 +295,16 @@ defmodule Once.PrefixedUnitTest do
       assert to_string(int) != ambiguous
     end
 
+    test "accepts and decodes hex32-encoded when ex_format != int" do
+      ambiguous = "t_1234567890123"
+
+      assert {:ok, raw} =
+               Prefixed.dump(ambiguous, nil, %{prefix: "t_", ex_format: :hex32, db_format: :raw})
+
+      assert <<int::64>> = raw
+      assert to_string(int) != ambiguous
+    end
+
     test "accepts and decodes raw when ex_format != int" do
       ambiguous = "t_12345678"
 
@@ -301,6 +329,18 @@ defmodule Once.PrefixedUnitTest do
 
     test "accepts and decodes hex-encoded when ex_format == int" do
       ambiguous_int = 1_234_567_890_123_456
+      ambiguous = "t_#{ambiguous_int}"
+
+      assert {:ok, ambiguous_int} ==
+               Prefixed.dump("#{ambiguous}", nil, %{
+                 prefix: "t_",
+                 ex_format: :signed,
+                 db_format: :signed
+               })
+    end
+
+    test "accepts and decodes hex32-encoded when ex_format == int" do
+      ambiguous_int = 1_234_567_890_123
       ambiguous = "t_#{ambiguous_int}"
 
       assert {:ok, ambiguous_int} ==
@@ -355,13 +395,13 @@ defmodule Once.PrefixedUnitTest do
   describe "persist_prefix option" do
     test "validates db_format compatibility when persist_prefix is true" do
       assert_raise ArgumentError,
-                   "option :persist_prefix requires db_format :raw, :hex or :url64",
+                   "option :persist_prefix requires db_format :raw, :hex, :hex32 or :url64",
                    fn ->
                      Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :signed)
                    end
 
       assert_raise ArgumentError,
-                   "option :persist_prefix requires db_format :raw, :hex or :url64",
+                   "option :persist_prefix requires db_format :raw, :hex, :hex32 or :url64",
                    fn ->
                      Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :unsigned)
                    end
@@ -373,6 +413,9 @@ defmodule Once.PrefixedUnitTest do
 
       assert %{persist_prefix: true, db_format: :hex} =
                Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :hex)
+
+      assert %{persist_prefix: true, db_format: :hex32} =
+               Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :hex32)
 
       assert %{persist_prefix: true, db_format: :raw} =
                Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :raw)
@@ -435,6 +478,19 @@ defmodule Once.PrefixedUnitTest do
 
     test "round-trip with persist_prefix true for hex format" do
       params = Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :hex, ex_format: :hex)
+      id = Prefixed.autogenerate(params)
+
+      {:ok, dumped} = Prefixed.dump(id, nil, params)
+      {:ok, loaded} = Prefixed.load(dumped, nil, params)
+
+      assert loaded == id
+      assert String.starts_with?(loaded, "t_")
+    end
+
+    test "round-trip with persist_prefix true for hex32 format" do
+      params =
+        Prefixed.init(prefix: "t_", persist_prefix: true, db_format: :hex32, ex_format: :hex32)
+
       id = Prefixed.autogenerate(params)
 
       {:ok, dumped} = Prefixed.dump(id, nil, params)
