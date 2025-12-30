@@ -7,19 +7,11 @@ defmodule Once.Prefixed do
   """
 
   @moduledoc """
-  A variant of `Once` that adds a prefix to IDs, making them more recognizable and self-documenting.
+  A variant of `Once` that adds a prefix to IDs, which makes them recognizable and self-documenting. This is useful for debugging, API clarity and type safety.
 
-  A prefixed ID looks like `"usr_AV7m9gAAAAU"` or `"prod_123"` - a human-readable prefix followed by the actual ID value. Note that even prefixed IDs are always binaries - using `:unsigned` or `:signed` as `:ex_format` results in numeric strings like `"prod_123"`. Like `Once` itself, you can convert between formats using `to_format/4`.
+  A prefixed ID looks like `"usr_AV7m9gAAAAU"` or `"prod_123"` - a human-readable prefix followed by the actual ID value. Note that prefixed IDs are always binaries - using `:unsigned` or `:signed` as `:ex_format` results in numeric strings like `"prod_123"`.
 
-  Prefixed IDs provide several benefits:
-
-  - **Self-documenting**: IDs clearly indicate what they reference (`usr_123` vs `prod_456`)
-  - **Debugging**: Easier to track IDs through logs and error messages
-  - **API clarity**: External APIs are more readable and less error-prone
-  - **Type safety**: Reduces risk of mixing up IDs from different tables
-  - **Grep-ability**: Easy to search codebase and logs for specific ID types
-
-  For more details on ID generation, formats, and options, see `Once`.
+  Like `Once` itself, you can convert between formats using `to_format/4`. For more details on ID generation, formats, and options, see `Once`.
 
   ## Usage
 
@@ -54,7 +46,7 @@ defmodule Once.Prefixed do
   >
   > When `persist_prefix: true`, you must use `:raw`, `:hex`, or `:url64` as `:db_format`. Integer formats (`:signed`, `:unsigned`) cannot store string prefixes.
 
-  Noce that values in your Elixir application **always have the prefix**, regardless of the `:persist_prefix` setting. Cast only accepts prefixed input - unprefixed values will be rejected.
+  Note that values in your Elixir application **always have the prefix**, regardless of the `:persist_prefix` setting. Cast only accepts prefixed input - unprefixed values will be rejected.
 
   ## Options
 
@@ -212,12 +204,12 @@ defmodule Once.Prefixed do
   # Private #
   ###########
 
-  defp prefix(nonce, prefix) when is_binary(nonce), do: <<prefix::binary, nonce::binary>>
-  defp prefix(nonce, prefix), do: nonce |> Integer.to_string() |> prefix(prefix)
+  defp prefix(id, prefix) when is_binary(id), do: <<prefix::binary, id::binary>>
+  defp prefix(id, prefix), do: id |> Integer.to_string() |> prefix(prefix)
 
-  defp maybe_prefix(<<nonce::binary>>, prefix, %{persist_prefix: true}), do: prefix(nonce, prefix)
-  defp maybe_prefix({:ok, nonce}, prefix, params), do: {:ok, maybe_prefix(nonce, prefix, params)}
-  defp maybe_prefix(nonce, _, _), do: nonce
+  defp maybe_prefix(<<id::binary>>, prefix, %{persist_prefix: true}), do: prefix(id, prefix)
+  defp maybe_prefix({:ok, id}, prefix, params), do: {:ok, maybe_prefix(id, prefix, params)}
+  defp maybe_prefix(id, _, _), do: id
 
   defp strip(prefixed, prefix) do
     case prefixed do
@@ -226,6 +218,6 @@ defmodule Once.Prefixed do
     end
   end
 
-  defp maybe_strip(<<nonce::binary>>, prefix, %{persist_prefix: true}), do: strip(nonce, prefix)
-  defp maybe_strip(nonce, _, _), do: {:ok, nonce}
+  defp maybe_strip(<<id::binary>>, prefix, %{persist_prefix: true}), do: strip(id, prefix)
+  defp maybe_strip(id, _, _), do: {:ok, id}
 end
