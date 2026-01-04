@@ -61,13 +61,14 @@ defmodule Once do
 
   There's a drawback to having different data formats for Elixir and SQL: it makes it harder to compare the two. The following are all the same ID:
 
-      -1
-      <<255, 255, 255, 255, 255, 255, 255, 255>>
-      "__________8"
-      18_446_744_073_709_551_615
-      "ffffffffffffffff"
+      -1                                           # signed int
+      <<255, 255, 255, 255, 255, 255, 255, 255>>   # raw
+      "__________8"                                # url64-encoded
+      18_446_744_073_709_551_615                   # unsigned int
+      "ffffffffffffffff"                           # hex-encoded
+      "vvvvvvvvvvvvu"                              # hex32-encoded
 
-  If you use the defaults `:url64` as the Elixir format and `:signed` in your database, you could see `"AAAAAACYloA"` in Elixir and `10_000_000` in your database. The reasoning behind these defaults is that the encoded format is readable, short, and JSON safe by default, while the signed format means you can use a standard bigint column type.
+  If you use the defaults `:url64` as the Elixir format and `:signed` in your database, you could see `"AAAAAACYloA"` in Elixir and `10_000_000` in your database. The reasoning behind these defaults is that the encoded format is readable, short, and JSON safe by default, while the signed format means you can use a standard bigint column type (resulting in a small, fast index).
 
   The negative integers will not cause problems with Postgres and MySQL, they both happily swallow them. Also, negative integers will only start to appear after ~70 years of usage. However, be careful if you wish to [sort by ID](#module-sorting-by-id).
 
@@ -113,7 +114,7 @@ defmodule Once do
       ["0000000000000000", "0000000000000001", "8000000000000000", "ffffffffffffffff"]
 
       # hex32 (lexicographic string comparison, same order as unsigned)
-      ["0000000000000", "0000000000002", "FVVVVVVVVVVVU", "VVVVVVVVVVVVU"]
+      ["0000000000000", "0000000000002", "fvvvvvvvvvvvu", "vvvvvvvvvvvvu"]
 
       # url64 (lexicographic but with different alphabet ordering, resulting in [0, 1, *unsigned-max*, signed-max])
       ["AAAAAAAAAAA", "AAAAAAAAAAE", "__________8", "f_________8"]
@@ -126,16 +127,19 @@ defmodule Once do
   Avoid `:url64` for sorting; its alphabet wasn't designed with lexicographic ordering in mind, making it unsuitable. Signed integers only preserve the order in their positive range.
 
   #### Database considerations
-  - PostgreSQL: Uses signed bigint with no native unsigned type. An "ORDER BY id" query will produce unexpected results when Once IDs become negative (~70 years after epoch). Consider using `:raw` format (stored as bytea) for correct sorting throughout the full range, combined with `:unsigned` or `:hex` format in your application. Since PG's raw bytes will often be rendered as hex, using hex in Elixir will simplify value comparison.
+  - PostgreSQL: The standard bigint type is a signed int; there is no native unsigned type.
+  An "ORDER BY id" query will produce unexpected results when Once IDs become negative (~70 years after epoch).
+  The easiest way to deal with this is to ignore the problem and assume that a) your app will not reach that age or b) Postgres will support unsigned ints at some point in the next 70 years.
+  Alternatively, use `:raw` format (stored as bytea) for correct sorting throughout the full range, combined with `:unsigned` or `:hex` format in your application.
   - MySQL: Supports unsigned bigint, so `:unsigned` format works perfectly for sorting.
 
   ## On local uniqueness
 
-  By locally unique, we mean unique within your domain or application. UUIDs are globally unique across domains, servers and applications. A Once is not, because 64 bits is not enough to achieve that. It is enough for local uniqueness however: you can generate 8 million IDs per second on 512 machines in parallel for 140 years straight before you run out of bits, by which time your great-grandchildren will deal with the problem. Even higher burst rates are possible and you can use separate `NoNoncense` instanses for every table if you wish.
+  By locally unique, we mean unique within your domain or application. UUIDs (of 128 bits) are globally unique across domains, servers and applications. A Once is not, because 64 bits is not enough to achieve that. It is enough for local uniqueness however; every entity in your domain (user, session, product, log, trace) can have a unique 64-bits ID because they can be generated at a sustained 8M/s/machine rate.
 
   ## Encrypted IDs
 
-  By default, IDs are generated using a machine init timestamp, machine ID and counter (although they should be considered to be opague). This means they leak a little information and are somewhat predictable. If that is unacceptable, you can use encrypted IDs. Note that encrypted IDs will cost you the data locality, decrease index performance a little and are slightly slower to generate. In order to use encrypted IDs:
+  By default, IDs are generated using a machine init timestamp, machine ID and counter (although they should be considered to be opaque). This means they leak a little information and are somewhat predictable. If that is unacceptable, you can use encrypted IDs. Note that encrypted IDs will cost you the data locality, decrease index performance and are slightly slower to generate. In order to use encrypted IDs:
   - Set [option](#module-options) `nonce_type: :encrypted`
   - initialize `NoNoncense` with option `base_key: <some 32-byte secret binary>`
   - (optional) change the encryption algorithm using option `:cipher64` from the default `:blowfish` to `:speck` (you will need optional dependency SpeckEx) or `:des3` (not recommended, it is the 0.x default but it is relatively slow)
