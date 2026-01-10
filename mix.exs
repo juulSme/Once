@@ -48,7 +48,9 @@ defmodule Once.MixProject do
       {:mix_test_watch, "~> 1.2", only: [:dev], runtime: false},
       {:ecto_sql, "~> 3.4", only: [:dev, :test]},
       {:postgrex, "~> 0.1", only: [:dev, :test]},
-      {:myxql, "~> 0.1", only: [:dev, :test]}
+      {:myxql, "~> 0.1", only: [:dev, :test]},
+      {:tidewave, "~> 0.5.0", only: [:dev]},
+      {:bandit, "~> 1.0", only: [:dev]}
     ]
   end
 
@@ -61,7 +63,9 @@ defmodule Once.MixProject do
       setup: ["deps.get", "ecto.setup", "cmd npm install --prefix assets"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"]
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      tidewave:
+        "run --no-halt -e 'Agent.start(fn -> Bandit.start_link(plug: Tidewave, port: 4100) end)'"
     ]
   end
 end
