@@ -4,6 +4,7 @@ defmodule TestOnce.DataCase do
   using do
     quote do
       alias MyApp.{PgRepo, MysqlRepo}
+      use Once.Constants
 
       import Ecto
       import Ecto.Changeset

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0]
+
+- Add support for masked IDs using option `mask: true`.
+- Merge `Once.Prefixed` into `Once` and soft-deprecate it. `Once` itself is a drop-in replacement.
+
 ## [1.0.0] - 2025-12-31
 
 - Upgrade to NoNoncense >= 1.0, which has breaking changes. Be sure to read its [migration guide](https://hexdocs.pm/no_noncense/migration.html).
