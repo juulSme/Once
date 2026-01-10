@@ -22,6 +22,14 @@ defmodule Once.Init do
       raise ArgumentError, "option :nonce_type is invalid: #{inspect(opts.nonce_type)}"
     end
 
+    if not is_boolean(opts.mask) do
+      raise ArgumentError, "option :mask must be a boolean"
+    end
+
+    if not is_boolean(opts.persist_prefix) do
+      raise ArgumentError, "option :persist_prefix must be a boolean"
+    end
+
     if opts.mask and opts.nonce_type == :encrypted do
       raise ArgumentError, "there is no point in masking encrypted nonces"
     end
@@ -30,7 +38,7 @@ defmodule Once.Init do
       raise ArgumentError, "option :prefix must be a binary"
     end
 
-    if opts.persist_prefix and opts.db_format in [:signed, :unsigned] do
+    if opts.persist_prefix and opts.db_format not in @binary_formats do
       raise ArgumentError,
             "option :persist_prefix requires db_format :raw, :hex, :hex32 or :url64"
     end
