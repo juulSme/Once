@@ -47,6 +47,10 @@ defmodule Once.Init do
       raise ArgumentError, "option :prefix can't be an empty string"
     end
 
+    if opts.persist_prefix and not is_binary(opts.prefix) do
+      raise ArgumentError, "option :persist_prefix can't be used without :prefix"
+    end
+
     if is_map_key(opts, :encrypt?) do
       raise ArgumentError, "option :encrypt? is deprecated"
     end

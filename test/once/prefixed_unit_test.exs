@@ -98,6 +98,12 @@ defmodule Once.PrefixedUnitTest do
         Once.init(prefix: "t_", persist_prefix: true, db_format: fmt)
       end
     end
+
+    test "reject :persist_prefix without :prefix" do
+      assert_raise ArgumentError, "option :persist_prefix can't be used without :prefix", fn ->
+        Once.init(persist_prefix: true, db_format: :hex)
+      end
+    end
   end
 
   describe "autogenerate/1" do
