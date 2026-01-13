@@ -2,14 +2,13 @@ defmodule Once.Parse do
   @moduledoc false
   use Once.Constants
   import Once.Encode
-
-  @type id :: Once.Prefix.id()
+  alias Once.Type
 
   @doc """
   Convert a value from format_in to format_out.
   If they are the same format, the format is validated.
   """
-  @spec maybe_convert(id(), Once.format(), Once.format()) :: :error | {:ok, id()}
+  @spec maybe_convert(Type.id(), Once.format(), Once.format()) :: :error | {:ok, Type.id()}
   def maybe_convert(value, format_in, format_out)
   def maybe_convert(value, :raw, :raw), do: {:ok, value}
 
@@ -42,27 +41,27 @@ defmodule Once.Parse do
   @doc """
   Identify the value's format. All ints are grouped together for convert_int/2 to deal with.
   """
-  @spec identify_format(id()) :: Once.format()
+  @spec identify_format(Type.id()) :: {:ok, Once.format()} | :error
   def identify_format(value)
-  def identify_format(<<_::88>>), do: :url64
-  def identify_format(<<_::64>>), do: :raw
-  def identify_format(<<_::128>>), do: :hex
-  def identify_format(<<_::104>>), do: :hex32
-  def identify_format(int) when is_integer(int), do: :unsigned
+  def identify_format(<<_::88>>), do: {:ok, :url64}
+  def identify_format(<<_::64>>), do: {:ok, :raw}
+  def identify_format(<<_::128>>), do: {:ok, :hex}
+  def identify_format(<<_::104>>), do: {:ok, :hex32}
+  def identify_format(int) when is_integer(int), do: {:ok, :unsigned}
   def identify_format(_), do: :error
 
   @doc """
   Parse value as a numeric string if the second arg is true.
   """
-  @spec maybe_parse_num_str(id(), boolean()) :: id()
+  @spec maybe_parse_num_str(Type.id(), boolean()) :: {:ok, Type.id()} | :error
   def maybe_parse_num_str(value, parse_int_opt)
   def maybe_parse_num_str(value, true) when is_binary(value), do: parse_num_str(value)
-  def maybe_parse_num_str(value, _), do: value
+  def maybe_parse_num_str(value, _), do: {:ok, value}
 
   @doc """
   Convert from a raw 8-byte binary to any format.
   """
-  @spec from_raw(<<_::64>>, Once.format()) :: id()
+  @spec from_raw(<<_::64>>, Once.format()) :: Type.id()
   def from_raw(raw, to_format)
   def from_raw(raw, :raw), do: raw
   def from_raw(raw, :url64), do: encode64(raw)
@@ -74,7 +73,7 @@ defmodule Once.Parse do
   @doc """
   Convert from any format to a raw 8-byte binary.
   """
-  @spec to_raw(id(), Once.format()) :: :error | {:ok, id()}
+  @spec to_raw(Type.id(), Once.format()) :: {:ok, <<_::64>>} | :error
   def to_raw(value, from_format)
   def to_raw(value, :raw), do: {:ok, value}
   def to_raw(value, :url64), do: decode64(value)
@@ -83,12 +82,10 @@ defmodule Once.Parse do
 
   def to_raw(value, int_format) when int_format in @int_formats do
     case convert_int(value, :unsigned) do
-      {:ok, int} -> {:ok, <<int::64>>}
+      {:ok, int} -> {:ok, <<int::unsigned-64>>}
       _ -> :error
     end
   end
-
-  def to_raw(_, :error), do: :error
 
   ###########
   # Private #
@@ -106,7 +103,7 @@ defmodule Once.Parse do
 
   defp parse_num_str(value) do
     try do
-      String.to_integer(value)
+      {:ok, String.to_integer(value)}
     rescue
       _ -> :error
     end

@@ -26,7 +26,7 @@ defmodule Once do
 
   Because a Once fits into an SQL bigint, they use little space and keep indexes small and fast. Because of their [structure](https://hexdocs.pm/no_noncense/NoNoncense.html#module-nonce-types) they have counter-like data locality, which helps your indexes perform well, [unlike UUIDv4s](https://www.cybertec-postgresql.com/en/unexpected-downsides-of-uuid-keys-in-postgresql/).
 
-  Once IDs are base on counter, time-sortable or encrypted nonces. These underlying values can then be encoded in several formats, can be prefixed and can be masked. And you can combine all of these options, providing great flexibility.
+  Once IDs are based on counter, time-sortable or encrypted nonces. These underlying values can then be encoded in several formats, can be prefixed and can be masked. And you can combine all of these options, providing great flexibility.
 
   The library has only `Ecto` and its sibling `NoNoncense` as dependencies. NoNoncense generates the actual values and performs incredibly well, hitting rates of tens of millions of nonces per second, and it also helps you to safeguard the uniqueness guarantees.
 
@@ -174,7 +174,7 @@ defmodule Once do
   """
   require Logger
   use Ecto.ParameterizedType
-  alias Once.{Parse, Constants, Init, Prefix}
+  alias Once.{Parse, Constants, Init, Prefix, Mask}
   use Constants
   import Prefix, only: [map_prefixed: 4]
 
@@ -199,7 +199,7 @@ defmodule Once do
           | {:db_format, format()}
           | {:nonce_type, nonce_type()}
           | {:mask, boolean()}
-          | {:prefix, binary()}
+          | {:prefix, binary() | nil}
           | {:persist_prefix, boolean()}
 
   @default_opts %{
@@ -235,44 +235,31 @@ defmodule Once do
   @impl true
   def load(nil, _, _), do: {:ok, nil}
 
-  # to mask we have to convert to raw first
-  def load(value, _, params = %{prefix: prefix}) when params.mask do
+  def load(value, _, params = %{prefix: prefix, ex_format: ex_fmt}) do
     to_strip = Prefix.if_persistent(prefix, params)
 
-    map_prefixed value, to_strip, prefix do
-      format_in = Parse.identify_format(stripped)
-
-      with {:ok, raw} <- Parse.to_raw(stripped, format_in) do
-        {:ok, NoNoncense.encrypt(params.no_noncense, raw) |> Parse.from_raw(params.ex_format)}
+    if params.mask do
+      map_prefixed value, to_strip, prefix do
+        Mask.to_masked_format(stripped, params.no_noncense, ex_fmt, false)
       end
+    else
+      do_to_format(value, ex_fmt, to_strip, prefix, ex_fmt in @int_formats)
     end
-  end
-
-  def load(value, _, params = %{prefix: prefix, ex_format: ex_format}) do
-    to_strip = Prefix.if_persistent(prefix, params)
-    do_to_format(value, ex_format, to_strip, prefix, ex_format in @int_formats)
   end
 
   @impl true
   def dump(nil, _, _), do: {:ok, nil}
 
-  # to unmask we have to convert to raw first
-  def dump(value, _, params = %{prefix: prefix}) when params.mask do
+  def dump(value, _, params = %{prefix: prefix, ex_format: ex_fmt, db_format: db_fmt}) do
     to_put = Prefix.if_persistent(prefix, params)
 
-    map_prefixed value, prefix, to_put do
-      parsed = Parse.maybe_parse_num_str(stripped, params.ex_format in @int_formats)
-      format_in = Parse.identify_format(parsed)
-
-      with {:ok, raw} <- Parse.to_raw(parsed, format_in) do
-        {:ok, NoNoncense.decrypt(params.no_noncense, raw) |> Parse.from_raw(params.db_format)}
+    if params.mask do
+      map_prefixed value, prefix, to_put do
+        Mask.to_unmasked_format(stripped, params.no_noncense, db_fmt, ex_fmt in @int_formats)
       end
+    else
+      do_to_format(value, db_fmt, prefix, to_put, ex_fmt in @int_formats)
     end
-  end
-
-  def dump(value, _, params = %{prefix: prefix, ex_format: ex_format, db_format: db_format}) do
-    to_put = Prefix.if_persistent(prefix, params)
-    do_to_format(value, db_format, prefix, to_put, ex_format in @int_formats)
   end
 
   @impl true
@@ -389,15 +376,16 @@ defmodule Once do
   # Private #
   ###########
 
-  defp do_to_format(value, format, prefix, parse_int) do
-    do_to_format(value, format, prefix, prefix, parse_int)
+  defp do_to_format(value, format, prefix, parse_int?) do
+    do_to_format(value, format, prefix, prefix, parse_int?)
   end
 
-  defp do_to_format(value, format, strip_prefix, put_prefix, parse_int) do
+  defp do_to_format(value, format, strip_prefix, put_prefix, parse_int?) do
     map_prefixed value, strip_prefix, put_prefix do
-      stripped_parsed = Parse.maybe_parse_num_str(stripped, parse_int)
-      format_in = Parse.identify_format(stripped_parsed)
-      Parse.maybe_convert(stripped_parsed, format_in, format)
+      with {:ok, stripped_parsed} <- Parse.maybe_parse_num_str(stripped, parse_int?),
+           {:ok, format_in} <- Parse.identify_format(stripped_parsed) do
+        Parse.maybe_convert(stripped_parsed, format_in, format)
+      end
     end
   end
 end
