@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0]
+
+- Improve init opts verification:
+  - `:mask` and `:persist_prefix` must be booleans
+  - `:persist_prefix` requires `:prefix`
+
 ## [1.1.0]
 
 - Add support for masked IDs using option `mask: true`.
