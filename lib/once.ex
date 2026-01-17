@@ -91,9 +91,9 @@ defmodule Once do
 
   - Set [option](#module-configuration) `nonce_type: :encrypted`
   - Initialize `NoNoncense` with option `base_key: <some 32-byte secret binary>`
-  - (optional) Change the encryption algorithm using option `:cipher64` from the default `:blowfish` to `:speck` (requires optional dependency SpeckEx) or `:des3` (not recommended - relatively slow and the 0.x default)
+  - (optional but recommended) Change the encryption algorithm using option `:cipher64` from the default `:blowfish` to `:speck` (requires optional dependency SpeckEx).
 
-  To learn more about nonce encryption and the available ciphers, see the [NoNoncense docs](https://hexdocs.pm/no_noncense/NoNoncense.html#module-nonce-encryption).
+  To learn more about nonce encryption and the available ciphers, see the [NoNoncense docs](https://hexdocs.pm/no_noncense/NoNoncense.html#module-encrypted-nonces).
 
   ### Masked IDs
 
