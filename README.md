@@ -55,6 +55,48 @@ Documentation can be found on [hexdocs.pm](https://hexdocs.pm/once/).
 - `mix test` runs the full suite (including PostgreSQL and MySQL integration tests).
 - `mix test.unit` runs only unit tests and does not require a running database.
 
+## Benchmarks
+
+Run the benchmark suite with:
+
+```sh
+mix bench
+```
+
+Latest run (2026-03-21):
+
+- Operating System: macOS
+- CPU: Apple M2
+- Cores: 8
+- Memory: 24 GB
+- Elixir: 1.18.4
+- Erlang/OTP: 28.1 (JIT enabled)
+- Benchee config: warmup 2 s, time 5 s, memory_time 1 s
+
+Results (iterations per second):
+
+| Scenario | ips |
+| --- | ---: |
+| autogenerate counter | 5.54 M |
+| autogenerate sortable | 4.99 M |
+| to_format url64 -> raw | 3.74 M |
+| autogenerate encrypted | 2.71 M |
+| autogenerate masked | 2.58 M |
+| to_format url64 -> hex32 | 2.22 M |
+
+Memory usage (average):
+
+| Scenario | avg memory |
+| --- | ---: |
+| autogenerate counter | 232 B |
+| autogenerate sortable | 232.36 B |
+| to_format url64 -> raw | 368 B |
+| autogenerate encrypted | 344 B |
+| autogenerate masked | 344 B |
+| to_format url64 -> hex32 | 512 B |
+
+These benchmark numbers are indicative only and can vary significantly depending on CPU, memory bandwidth, Elixir/Erlang version, compiler/JIT behavior and background system load.
+
 ## Usage
 
 To get going, you need to set up a `NoNoncense` instance to generate the base unique values. Follow [its documentation](https://hexdocs.pm/no_noncense) to do so. `Once` expects an instance with its own module name by default, like so:
