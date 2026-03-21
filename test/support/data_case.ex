@@ -3,6 +3,8 @@ defmodule TestOnce.DataCase do
 
   using do
     quote do
+      @moduletag :db
+
       alias MyApp.{PgRepo, MysqlRepo}
       use Once.Constants
 

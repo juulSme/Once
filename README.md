@@ -50,6 +50,11 @@ end
 
 Documentation can be found on [hexdocs.pm](https://hexdocs.pm/once/).
 
+## Testing
+
+- `mix test` runs the full suite (including PostgreSQL and MySQL integration tests).
+- `mix test.unit` runs only unit tests and does not require a running database.
+
 ## Usage
 
 To get going, you need to set up a `NoNoncense` instance to generate the base unique values. Follow [its documentation](https://hexdocs.pm/no_noncense) to do so. `Once` expects an instance with its own module name by default, like so:
