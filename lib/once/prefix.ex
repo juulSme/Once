@@ -35,10 +35,9 @@ defmodule Once.Prefix do
   """
   defmacro map_prefixed(value, strip_prefix, put_prefix, do: process) do
     quote do
-      with {:ok, var!(stripped)} <-
-             unquote(__MODULE__).strip(unquote(value), unquote(strip_prefix)),
+      with {:ok, var!(stripped)} <- Once.Prefix.strip(unquote(value), unquote(strip_prefix)),
            {:ok, processed} <- unquote(process) do
-        {:ok, unquote(__MODULE__).put(processed, unquote(put_prefix))}
+        {:ok, Once.Prefix.put(processed, unquote(put_prefix))}
       end
     end
   end

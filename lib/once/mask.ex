@@ -7,16 +7,18 @@ defmodule Once.Mask do
   """
   @spec to_masked_format(Type.id(), module(), Once.format(), boolean()) ::
           {:ok, Type.id()} | :error
-  def to_masked_format(value, no_noncense, format_out, parse_num?),
-    do: do_format(value, no_noncense, format_out, parse_num?, true)
+  def to_masked_format(value, no_noncense, format_out, parse_num?) do
+    do_format(value, no_noncense, format_out, parse_num?, true)
+  end
 
   @doc """
   Convert a masked value to an unmasked format.
   """
   @spec to_unmasked_format(Type.id(), module(), Once.format(), boolean()) ::
           {:ok, Type.id()} | :error
-  def to_unmasked_format(value, no_noncense, format_out, parse_num?),
-    do: do_format(value, no_noncense, format_out, parse_num?, false)
+  def to_unmasked_format(value, no_noncense, format_out, parse_num?) do
+    do_format(value, no_noncense, format_out, parse_num?, false)
+  end
 
   ###########
   # Private #
