@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.2] (and [1.2.1])
+
+Non-functional changes only.
+
+- Add `Ecto Schema Integration` section to docs.
+- Add `mix test.unit` to run base tests without a database.
+- Minor code readability improvements.
+
 ## [1.2.0]
 
 - Improve init opts verification:
