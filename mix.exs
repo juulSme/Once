@@ -31,6 +31,10 @@ defmodule Once.MixProject do
     ]
   end
 
+  def cli do
+    [preferred_envs: ["test.unit": :test]]
+  end
+
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
@@ -64,6 +68,7 @@ defmodule Once.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      "test.unit": fn args -> Mix.Tasks.Test.run(["--exclude", "db" | args]) end,
       tidewave:
         "run --no-halt -e 'Agent.start(fn -> Bandit.start_link(plug: Tidewave, port: 4100) end)'"
     ]

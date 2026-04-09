@@ -1,8 +1,10 @@
 ExUnit.start()
-{:ok, _} = Supervisor.start_link([MyApp.PgRepo, MyApp.MysqlRepo], strategy: :one_for_one)
 
-Ecto.Adapters.SQL.Sandbox.mode(MyApp.PgRepo, :manual)
-Ecto.Adapters.SQL.Sandbox.mode(MyApp.MysqlRepo, :manual)
+unless :db in (ExUnit.configuration()[:exclude] || []) do
+  {:ok, _} = Supervisor.start_link([MyApp.PgRepo, MyApp.MysqlRepo], strategy: :one_for_one)
+  Ecto.Adapters.SQL.Sandbox.mode(MyApp.PgRepo, :manual)
+  Ecto.Adapters.SQL.Sandbox.mode(MyApp.MysqlRepo, :manual)
+end
 
 base_key =
   <<93, 198, 179, 97, 145, 106, 54, 165, 219, 77, 223, 54, 58, 16, 164, 222, 242, 214, 181, 143,
