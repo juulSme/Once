@@ -171,6 +171,33 @@ defmodule Once do
 
   - **PostgreSQL**: Only supports signed integers. Using `"ORDER BY id"` will work fine until you reach negative numbers (same as `:signed` in Elixir). The easiest way to deal with this is to ignore the problem and assume that a) your app will not reach that age or b) Postgres will support unsigned ints at some point in the next 70 years. Alternatively, use `db_format: :hex` or `:hex32`. These are fixed-length, human-readable formats that sort correctly throughout the range, at the cost of storage space.
   - **MySQL**: Supports unsigned bigint, so `:unsigned` format works perfectly for sorting.
+
+  ## Ecto Schema Integration
+
+  The recommended approach is to define a base schema module that centralises your Once configuration. This way you only need to change Once options in one place:
+
+      defmodule MyApp.Schema do
+        defmacro __using__(_) do
+          quote do
+            use Ecto.Schema
+
+            @once_opts [ex_format: :hex32]
+            @primary_key {:id, Once, [autogenerate: true] ++ @once_opts}
+            @foreign_key_type Once
+          end
+        end
+      end
+
+  Then in your schemas, pass `@once_opts` to each `belongs_to`. You can merge in field-specific overrides with `++`:
+
+      defmodule MyApp.Transaction do
+        use MyApp.Schema
+
+        schema "transactions" do
+          belongs_to :user, MyApp.User, @once_opts
+          belongs_to :other, MyApp.User, @once_opts ++ [on_replace: :nilify]
+        end
+      end
   """
   require Logger
   use Ecto.ParameterizedType
