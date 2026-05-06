@@ -4,7 +4,7 @@ Once is an Ecto type for locally unique (unique within your domain or applicatio
 
 Because a Once fits into an SQL bigint, they use little space and keep indexes small and fast. Because of their [structure](https://hexdocs.pm/no_noncense/NoNoncense.html#module-nonce-types) they have counter-like data locality, which helps your indexes perform well, [unlike UUIDv4s](https://www.cybertec-postgresql.com/en/unexpected-downsides-of-uuid-keys-in-postgresql/).
 
-Once IDs are base on counter, time-sortable or encrypted nonces. These underlying values can then be encoded in several formats, can be prefixed and can be masked. And you can combine all of these options, providing great flexibility.
+Once IDs are based on counter, time-sortable or encrypted nonces. These underlying values can then be encoded in several formats, can be prefixed and can be masked. And you can combine all of these options, providing great flexibility.
 
 The library has only `Ecto` and its sibling `NoNoncense` as dependencies. NoNoncense generates the actual values and performs incredibly well, hitting rates of tens of millions of nonces per second, and it also helps you to safeguard the uniqueness guarantees.
 

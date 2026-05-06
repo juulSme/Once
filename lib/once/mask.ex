@@ -28,12 +28,12 @@ defmodule Once.Mask do
     with {:ok, parsed} <- Parse.maybe_parse_num_str(value, parse_num?),
          {:ok, format_in} <- Parse.identify_format(parsed),
          {:ok, raw} <- Parse.to_raw(parsed, format_in) do
-      {:ok, mask(raw, no_noncense, mask?) |> Parse.from_raw(format_out)}
+      {:ok, crypt(raw, no_noncense, mask?) |> Parse.from_raw(format_out)}
     end
   end
 
-  @compile {:inline, mask: 3}
-  defp mask(value, no_noncense, mask?)
-  defp mask(value, no_noncense, true), do: NoNoncense.encrypt(no_noncense, value)
-  defp mask(value, no_noncense, _), do: NoNoncense.decrypt(no_noncense, value)
+  @compile {:inline, crypt: 3}
+  defp crypt(value, no_noncense, encrypt?)
+  defp crypt(value, no_noncense, true), do: NoNoncense.encrypt(no_noncense, value)
+  defp crypt(value, no_noncense, _), do: NoNoncense.decrypt(no_noncense, value)
 end

@@ -35,6 +35,7 @@ defmodule Once.Prefix do
   """
   defmacro map_prefixed(value, strip_prefix, put_prefix, do: process) do
     quote do
+      # unhygienic variable used to optimize for performance, the macro is considered private
       with {:ok, var!(stripped)} <- Once.Prefix.strip(unquote(value), unquote(strip_prefix)),
            {:ok, processed} <- unquote(process) do
         {:ok, Once.Prefix.put(processed, unquote(put_prefix))}

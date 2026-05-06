@@ -47,6 +47,7 @@ defmodule Once.Parse do
   def identify_format(<<_::64>>), do: {:ok, :raw}
   def identify_format(<<_::128>>), do: {:ok, :hex}
   def identify_format(<<_::104>>), do: {:ok, :hex32}
+  # Both signed and unsigned integers match here; convert_int/2 handles the distinction.
   def identify_format(int) when is_integer(int), do: {:ok, :unsigned}
   def identify_format(_), do: :error
 
@@ -102,6 +103,8 @@ defmodule Once.Parse do
   defp convert_int(int, _), do: {:ok, int}
 
   defp parse_num_str(value) do
+    # String.to_integer/1 calls :erlang.binary_to_integer/1
+    # which is faster than Integer.parse/1, assuming errors are a small minority of cases
     try do
       {:ok, String.to_integer(value)}
     rescue

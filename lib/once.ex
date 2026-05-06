@@ -6,7 +6,7 @@ defmodule Once do
 
   - `:url64` a url64-encoded string of 11 characters, for example `"zAjhfZyAAAE"`
   - `:hex` a hex-encoded string of 16 characters, for example `"cc08e17d9c800001"`
-  - `:raw` a bitstring of 64 bits, for example `<<204, 8, 225, 125, 156, 128, 0, 1>>`
+  - `:raw` a binary of 8 bytes, for example `<<204, 8, 225, 125, 156, 128, 0, 1>>`
   - `:signed` a signed 64-bits integer between `-(2^63)` and `2^63-1`, for example `-3744495160545771519`
   - `:unsigned` an unsigned 64-bits integer between `0` and `2^64-1`, for example `14702248913163780097`
   - `:hex32` an extended-hex string of 13 characters, for example `"pg4e2vcsg0002"`
@@ -81,7 +81,7 @@ defmodule Once do
 
   The prefixes can optionally be persisted to the database. This is controlled by option `:persist_prefix`, the default is `false`. If the prefix is not persisted, it only exists in Elixir and is stripped before storing an ID in the database, and re-added on load. This allows us to still use 64-bit integer columns. So in Elixir you could have `"usr_AV7m9gAAAAU"` while in the database you would have `98770186085072901`.
 
-  With `persist_prefix: true`, the full prefixed string is stored. This sacrifices storage efficiency for database-level readability. Your ID would look like `"usr_AV7m9gAAAAU"` in both Elixir and your database. You can only use `db_format: :url64`, `:hex`, `hex32` or `:raw` with `persist_prefix: true`.
+  With `persist_prefix: true`, the full prefixed string is stored. This sacrifices storage efficiency for database-level readability. Your ID would look like `"usr_AV7m9gAAAAU"` in both Elixir and your database. You can only use `db_format: :url64`, `:hex`, `:hex32` or `:raw` with `persist_prefix: true`.
 
   Use `to_format/3` with the `:prefix` option to convert between formats while preserving the prefix.
 
@@ -105,7 +105,7 @@ defmodule Once do
   - Initialize `NoNoncense` with option `base_key: <some 32-byte secret binary>`
   - Works with nonce types `:counter` and `:sortable` (there's no point in masking an encrypted nonce)
 
-  **Benefits**: Masked IDs have the database performance of plaintext IDs, but the application sees encrypted values. `ORDER BY id` and keyset pagination work transparently (cast decrypts input). No database migration is needed for existing IDs.
+  **Benefits**: Masked IDs have the database performance of plaintext IDs, but the application sees encrypted values. `cast/2` transparently decrypts its input, so `ORDER BY id` queries and keyset pagination work correctly — API consumers pass masked IDs and they route to the right database rows without any manual decryption. No database migration is needed for existing IDs.
 
   **Trade-offs**: Database and application IDs look completely different (operational friction with SQL/BI tools), slight performance cost for encryption/decryption on every read/write, ordering info can leak into the application when using `ORDER BY id` queries.
 
@@ -188,7 +188,7 @@ defmodule Once do
         end
       end
 
-  Then in your schemas, pass `@once_opts` to each `belongs_to`. You can merge in field-specific overrides with `++`:
+  Note that `@foreign_key_type` sets the type module but not the params (format, prefix, etc.), so `@once_opts` must also be passed to each `belongs_to`. You can merge in field-specific overrides with `++`:
 
       defmodule MyApp.Transaction do
         use MyApp.Schema
@@ -199,7 +199,6 @@ defmodule Once do
         end
       end
   """
-  require Logger
   use Ecto.ParameterizedType
   alias Once.{Parse, Constants, Init, Prefix, Mask}
   use Constants
@@ -291,6 +290,8 @@ defmodule Once do
 
   @impl true
   def autogenerate(params) when params.mask do
+    # Returns the masked (encrypted) Elixir-side value.
+    # dump/3 will decrypt it before writing to the database.
     NoNoncense.encrypted_nonce(params.no_noncense, 64, params.nonce_type)
     |> Parse.from_raw(params.ex_format)
     |> Prefix.put(params.prefix)
