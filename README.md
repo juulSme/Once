@@ -77,3 +77,11 @@ end
 ```
 
 And that's it! Be sure to look at [hexdocs.pm](https://hexdocs.pm/once/) for options and additional info.
+
+## Compatibility
+
+Elixir 1.18+ and OTP 27+ are fully supported and tested in CI.
+
+Elixir 1.16–1.17 (with OTP 26+) are supported on a best-effort basis and tested in CI. Issues will be considered but may not be fixed if they require significant workarounds.
+
+Older versions are not supported.

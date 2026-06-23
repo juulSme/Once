@@ -30,8 +30,13 @@ jobs:
       # https://hexdocs.pm/elixir/1.18/compatibility-and-deprecations.html#compatibility-between-elixir-and-erlang-otp
       matrix:
         include:
+          # soft support floor
           - elixir: 1.16.x
             otp: 26.x
+          # support floor
+          - elixir: 1.18.x
+            otp: 27.x
+          # support ceiling
           - elixir: 1.20.x
             otp: 29.x
 

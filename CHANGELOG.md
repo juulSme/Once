@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0]
+
+- Formulate an explicit support policy.
+- Support Elixir 1.20 and Erlang/OTP 29.
+
 ## [1.2.2] (and [1.2.1])
 
 Non-functional changes only.
