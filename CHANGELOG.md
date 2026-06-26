@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1]
+
+- Update hex description to advertise features better
+
 ## [1.3.0]
 
 - Formulate an explicit support policy.
