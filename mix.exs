@@ -10,7 +10,8 @@ defmodule Once.MixProject do
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
-      description: "Ecto type for 64-bit IDs - prefixed, k-sorted, masked, multiformat, fast",
+      description:
+        "Ecto type for 64-bit IDs - prefixed, k-sorted, masked, multiformat, distributed, fast",
       package: [
         licenses: ["Apache-2.0"],
         links: %{github: "https://github.com/juulSme/Once"},
