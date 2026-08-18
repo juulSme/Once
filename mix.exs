@@ -46,13 +46,13 @@ defmodule Once.MixProject do
     [
       {:ex_doc, "~> 0.36", only: [:dev, :test], runtime: false},
       {:benchee, "~> 1.0", only: [:dev], runtime: false},
-      {:no_noncense, "~> 1.1"},
+      {:no_noncense, "~> 2.0 or ~> 1.1"},
       {:ecto, "~> 3.0"},
       {:mix_test_watch, "~> 1.2", only: [:dev], runtime: false},
       {:ecto_sql, "~> 3.4", only: [:dev, :test]},
       {:postgrex, "~> 0.1", only: [:dev, :test]},
       {:myxql, "~> 0.1", only: [:dev, :test]},
-      {:tidewave, "~> 0.5.0", only: [:dev]},
+      {:tidewave, "~> 0.5", only: [:dev]},
       {:bandit, "~> 1.0", only: [:dev]}
     ]
   end

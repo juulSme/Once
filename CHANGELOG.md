@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0]
+
+- Add NoNoncense 2.0 compatibility and adapt getting started guides.
+
 ## [1.3.1]
 
 - Update hex description to advertise features better

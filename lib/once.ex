@@ -36,14 +36,20 @@ defmodule Once do
 
   ## Quick Start
 
-  To get going, you need to set up a `NoNoncense` instance to generate the base unique values. Follow [its documentation](https://hexdocs.pm/no_noncense) to do so. `Once` expects an instance with its own module name by default, like so:
+  To get going, you need to set up a `NoNoncense` instance to generate the base unique values. Follow [its documentation](https://hexdocs.pm/no_noncense) to do so. `Once` expects an instance with its own module name by default:
 
       # application.ex (read the NoNoncense docs!)
-      machine_id = NoNoncense.MachineId.id!(opts)
-      NoNoncense.init(name: Once, machine_id: machine_id)
+      children = [
+        MyApp.Repo,
+        {NoNoncense.MachineId,
+          # see NoNoncense.MachineId for different strategies
+          strategy: NoNoncense.MachineId.Strategy.SqlLease,
+          strategy_opts: [repo: MyApp.Repo],
+          # if you want to use encrypted/masked IDs, also pass a 256-bits key
+          instances: [[name: Once, base_key: System.fetch_env!("ONCE_SECRET_KEY")]]}
+      ]
 
-      # if you want to use encrypted/masked IDs, also pass a 256-bits key
-      NoNoncense.init(name: Once, machine_id: machine_id, base_key: System.get_env("ONCE_SECRET_KEY"))
+      Supervisor.start_link(children, strategy: :one_for_one, name: MyApp.Supervisor)
 
   In your `Ecto` schemas, you can then use the type:
 
