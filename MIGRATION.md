@@ -1,5 +1,12 @@
 # Migration Guide
 
+## Upgrading to v2.0.0
+
+In major version 2, nothing changed directly in Once itself.
+However, it depends on `NoNoncense` 2.0 which introduces breaking changes in its bootstrapping procedure,
+because it now offers proper machine ID lease management and monitoring.
+Follow its [migration guide](https://hexdocs.pm/no_noncense/migration.html) to set up your NoNoncense instance and you are good to go.
+
 ## Upgrading to v1.0.0
 
 Version 1.0.0 introduces breaking changes that follow from `NoNoncense` 1.0.0 breaking changes. Be sure to read its [migration guide](https://hexdocs.pm/no_noncense/migration.html).
