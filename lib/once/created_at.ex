@@ -27,7 +27,8 @@ defmodule Once.CreatedAt do
   must match the epoch used to generate the IDs.
   The timestamp represents ID generation time, not database insertion time.
   Only sortable IDs are supported; masked sortable IDs are stored unmasked and
-  are supported. Database format and persisted prefix options must match the ID.
+  are supported, but exposing their timestamp reveals their generation time.
+  Database format and persisted prefix options must match the ID.
 
   The field is populated when loaded from the database, not automatically when
   the ID is generated or inserted.
