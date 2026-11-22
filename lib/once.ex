@@ -115,6 +115,14 @@ defmodule Once do
 
   **Trade-offs**: Database and application IDs look completely different (operational friction with SQL/BI tools), slight performance cost for encryption/decryption on every read/write, ordering info can leak into the application when using `ORDER BY id` queries.
 
+  ### Querying Sortable IDs
+
+  `Once.Query` provides Ecto query macros for filtering sortable IDs by generation time. See `Once.Query` for the supported comparisons, epoch configuration, and database ordering requirements.
+
+  ### Reading ID Generation Time
+
+  `Once.CreatedAt` exposes a sortable ID's generation time as a read-only `DateTime` field, without a separate timestamp column. This is the time the ID was generated, not necessarily when its row was inserted. Exposing it for masked IDs reveals their generation time. See `Once.CreatedAt` for schema configuration and limitations.
+
   ## Configuration
 
   ### Options
@@ -259,6 +267,10 @@ defmodule Once do
 
   @impl true
   def cast(nil, _), do: {:ok, nil}
+
+  def cast(%Once.Query.Boundary{} = boundary, params) do
+    Once.Query.Boundary.cast(boundary, params)
+  end
 
   def cast(value, %{ex_format: ex_format, prefix: prefix}) do
     do_to_format(value, ex_format, prefix, ex_format in @int_formats)
