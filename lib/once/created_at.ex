@@ -92,9 +92,8 @@ defmodule Once.CreatedAt do
 
   def load(value, _, params) do
     with {:ok, value} <- Prefix.strip(value, Prefix.if_persistent(params.prefix, params)),
-         {:ok, <<timestamp::42, _::22>>} <- to_raw(value, params.db_format),
-         {:ok, datetime} <- DateTime.from_unix(params.epoch + timestamp, :millisecond) do
-      {:ok, datetime}
+         {:ok, raw_nonce} <- to_raw(value, params.db_format) do
+      {:ok, NoNoncense.created_at(raw_nonce, params.epoch)}
     else
       _ -> :error
     end
