@@ -71,8 +71,8 @@ defmodule Once.CreatedAtTest do
   test "accepts query boundaries only with the matching epoch" do
     epoch = DateTime.to_unix(@epoch, :millisecond)
     params = Once.CreatedAt.init(epoch: @epoch, nonce_type: :sortable)
-    boundary = Once.Query.Boundary.new(epoch + 10, epoch, 0)
-    wrong_epoch = Once.Query.Boundary.new(epoch + 10, epoch + 1, 0)
+    boundary = Once.Query.Boundary.new(epoch + 10, epoch, :lower)
+    wrong_epoch = Once.Query.Boundary.new(epoch + 10, epoch + 1, :lower)
 
     assert {:ok, ^boundary} = Once.CreatedAt.cast(boundary, params)
     assert {:ok, 10 * 4_194_304} == Once.CreatedAt.dump(boundary, nil, params)
@@ -88,7 +88,7 @@ defmodule Once.CreatedAtTest do
 
   test "dumps query boundaries with numeric, masked and persisted-prefix options" do
     epoch = DateTime.to_unix(@epoch, :millisecond)
-    boundary = Once.Query.Boundary.new(epoch + 10, epoch, 0)
+    boundary = Once.Query.Boundary.new(epoch + 10, epoch, :lower)
 
     for masked <- [false, true] do
       params =
@@ -268,6 +268,45 @@ defmodule Once.CreatedAtDbTest do
 
       assert_raise ArgumentError, ~r/query epoch does not match field epoch/, fn ->
         repo.all(query)
+      end
+    end
+  end
+
+  test "queries include the last ID of the final signed millisecond" do
+    timestamp = 1_735_689_600_000 + 2 ** 41 - 1
+    last_id = 2 ** 63 - 1
+    values = [last_id - 2 ** 22, last_id - 1, last_id]
+
+    for repo <- [MyApp.PgRepo, MyApp.MysqlRepo] do
+      rows =
+        Enum.map(values, fn value ->
+          %{
+            bigint_id: value,
+            bin_id: Once.to_format!(value, :raw),
+            string_id: "id_" <> Once.to_format!(value, :hex)
+          }
+        end)
+
+      repo.insert_all("test_table", rows)
+
+      for field <- [:bigint_id, :bigint_created_at, :bin_created_at, :string_created_at] do
+        queries = [
+          {from(row in Schema, where: at(field(row, ^field), ^timestamp)),
+           [last_id - 1, last_id]},
+          {from(row in Schema, where: earlier_or_at(field(row, ^field), ^timestamp)), values},
+          {from(row in Schema, where: later_than(field(row, ^field), ^timestamp)), []}
+        ]
+
+        for {query, expected} <- queries do
+          actual =
+            query
+            |> select([row], row.bigint_id)
+            |> repo.all()
+            |> Enum.map(&Once.to_format!(&1, :unsigned))
+            |> Enum.sort()
+
+          assert actual == expected
+        end
       end
     end
   end

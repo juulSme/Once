@@ -2,13 +2,14 @@ defmodule Once.Query.Boundary do
   @moduledoc false
   alias Once.{Parse, Prefix}
 
-  defstruct [:unix_ms, :epoch, :offset]
+  defstruct [:unix_ms, :epoch, :bound]
 
   @signed_ts_limit 2 ** 41
   @unsigned_ts_limit 2 ** 42
+  @last_id_of_ts_tail 2 ** 22 - 1
 
-  def new(timestamp, epoch, offset) do
-    %__MODULE__{unix_ms: to_unix_ms!(timestamp, "timestamp"), epoch: epoch, offset: offset}
+  def new(timestamp, epoch, bound) when bound in [:lower, :upper] do
+    %__MODULE__{unix_ms: to_unix_ms!(timestamp, "timestamp"), epoch: epoch, bound: bound}
   end
 
   def cast(%__MODULE__{} = boundary, params) do
@@ -21,7 +22,7 @@ defmodule Once.Query.Boundary do
             "database format #{inspect(params.db_format)} does not sort by timestamp"
     end
 
-    timestamp = boundary.unix_ms - boundary.epoch + boundary.offset
+    timestamp = boundary.unix_ms - boundary.epoch
     limit = if params.db_format == :signed, do: @signed_ts_limit, else: @unsigned_ts_limit
 
     if timestamp < 0 or timestamp >= limit do
@@ -29,7 +30,8 @@ defmodule Once.Query.Boundary do
             "timestamp is outside the sortable range for #{inspect(params.db_format)}"
     end
 
-    raw = <<timestamp::42, 0::22>>
+    suffix = if boundary.bound == :lower, do: 0, else: @last_id_of_ts_tail
+    raw = <<timestamp::42, suffix::22>>
     raw = if params.mask, do: NoNoncense.encrypt(params.no_noncense, raw), else: raw
     {:ok, raw |> Parse.from_raw(params.ex_format) |> Prefix.put(params.prefix)}
   end

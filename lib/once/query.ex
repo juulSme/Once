@@ -35,8 +35,7 @@ defmodule Once.Query do
   in the first half of their timestamp range. All IDs in the field must use the
   configured epoch, which is not inferred or checked against the generator.
 
-  A timestamp requiring a boundary outside the supported nonce range is rejected,
-  including the upper boundary of the last representable millisecond.
+  A timestamp outside the supported nonce range is rejected.
   """
 
   use Once.Constants
@@ -112,15 +111,16 @@ defmodule Once.Query do
               "module attribute or field access; bind other expressions to a variable first"
     end
 
-    lower = boundary_ast(timestamp, epoch, 0)
-    upper = boundary_ast(timestamp, epoch, 1)
+    # lower = first possible ID of target timestamp, upper = last possible ID
+    lower = boundary_ast(timestamp, epoch, :lower)
+    upper = boundary_ast(timestamp, epoch, :upper)
 
     case operation do
       :lt -> quote do: unquote(field) < unquote(lower)
       :gte -> quote do: unquote(field) >= unquote(lower)
-      :gt -> quote do: unquote(field) >= unquote(upper)
-      :lte -> quote do: unquote(field) < unquote(upper)
-      :eq -> quote do: unquote(field) >= unquote(lower) and unquote(field) < unquote(upper)
+      :gt -> quote do: unquote(field) > unquote(upper)
+      :lte -> quote do: unquote(field) <= unquote(upper)
+      :eq -> quote do: unquote(field) >= unquote(lower) and unquote(field) <= unquote(upper)
     end
   end
 
@@ -139,9 +139,9 @@ defmodule Once.Query do
 
   defp simple?(_), do: false
 
-  defp boundary_ast(timestamp, epoch, offset) do
+  defp boundary_ast(timestamp, epoch, bound) do
     quote do
-      ^Once.Query.Boundary.new(unquote(timestamp), unquote(epoch), unquote(offset))
+      ^Once.Query.Boundary.new(unquote(timestamp), unquote(epoch), unquote(bound))
     end
   end
 end

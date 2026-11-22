@@ -45,14 +45,18 @@ defmodule Once.QueryTest do
     type = Schema.__schema__(:type, :sortable)
 
     queries = [
-      {from(row in Schema, where: Once.Query.earlier_than(row.sortable, ^time)), [10]},
-      {from(row in Schema, where: Once.Query.later_or_at(row.sortable, ^time)), [10]},
-      {from(row in Schema, where: Once.Query.later_than(row.sortable, ^time)), [11]},
-      {from(row in Schema, where: Once.Query.earlier_or_at(row.sortable, ^time)), [11]},
-      {from(row in Schema, where: Once.Query.at(row.sortable, ^time)), [10, 11]}
+      {from(row in Schema, where: Once.Query.earlier_than(row.sortable, ^time)),
+       [10 * 4_194_304]},
+      {from(row in Schema, where: Once.Query.later_or_at(row.sortable, ^time)), [10 * 4_194_304]},
+      {from(row in Schema, where: Once.Query.later_than(row.sortable, ^time)),
+       [11 * 4_194_304 - 1]},
+      {from(row in Schema, where: Once.Query.earlier_or_at(row.sortable, ^time)),
+       [11 * 4_194_304 - 1]},
+      {from(row in Schema, where: Once.Query.at(row.sortable, ^time)),
+       [10 * 4_194_304, 11 * 4_194_304 - 1]}
     ]
 
-    for {query, milliseconds} <- queries do
+    for {query, expected} <- queries do
       [%{params: params}] = query.wheres
 
       dumped =
@@ -62,7 +66,7 @@ defmodule Once.QueryTest do
           result
         end)
 
-      assert dumped == Enum.map(milliseconds, &(&1 * 4_194_304))
+      assert dumped == expected
     end
   end
 
@@ -83,7 +87,7 @@ defmodule Once.QueryTest do
         result
       end)
 
-    assert dumped == [10 * 4_194_304, 11 * 4_194_304]
+    assert dumped == [10 * 4_194_304, 11 * 4_194_304 - 1]
   end
 
   test "uses the NoNoncense default epoch when none is configured" do
@@ -111,7 +115,7 @@ defmodule Once.QueryTest do
 
     for timestamp <- [time, DateTime.to_unix(time, :millisecond)] do
       query = from row in Schema, where: at(row.sortable, ^timestamp)
-      [%{expr: {:and, _, [{:>=, _, _}, {:<, _, _}]}, params: params}] = query.wheres
+      [%{expr: {:and, _, [{:>=, _, _}, {:<=, _, _}]}, params: params}] = query.wheres
 
       dumped =
         Enum.map(params, fn {value, _} ->
@@ -122,7 +126,7 @@ defmodule Once.QueryTest do
           result
         end)
 
-      assert dumped == [10 * 4_194_304, 11 * 4_194_304]
+      assert dumped == [10 * 4_194_304, 11 * 4_194_304 - 1]
     end
   end
 
@@ -180,7 +184,7 @@ defmodule Once.QueryDirectTest do
   test "imports default macros into Ecto expressions" do
     time = ~U[2025-01-01 00:00:00.010Z]
     query = from row in Schema, where: at(row.sortable, ^time)
-    assert [%{expr: {:and, _, [{:>=, _, _}, {:<, _, _}]}}] = query.wheres
+    assert [%{expr: {:and, _, [{:>=, _, _}, {:<=, _, _}]}}] = query.wheres
   end
 end
 
