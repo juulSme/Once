@@ -86,20 +86,19 @@ And that's it! Be sure to look at [hexdocs.pm](https://hexdocs.pm/once/) for opt
 
 ### Querying sortable IDs
 
-For fields configured with `nonce_type: :sortable`, define a macro module with
-the same epoch used by the generator to filter by ID generation time:
+For fields configured with `nonce_type: :sortable`, import `Once.Query` to filter
+by ID generation time:
 
 ```elixir
-defmodule MyApp.IDQuery do
-  use Once.Query, epoch: 1_735_689_600_000
-end
-
 import Ecto.Query
-import MyApp.IDQuery
+import Once.Query
 
 from p in MyApp.Post, where: gte(p.id, ^start_time) and lt(p.id, ^end_time)
+from p in MyApp.Post, where: eq(p.id, ^timestamp)
 ```
 
+The epoch defaults to 2025-01-01 00:00:00 UTC. If the generator uses a different
+epoch, define a module with `use Once.Query, epoch: ...` and import it instead.
 The epoch and timestamps can be `DateTime`s or integer Unix milliseconds. See
 `Once.Query` for the available predicates and their requirements.
 
@@ -114,15 +113,15 @@ schema "posts" do
   field :event_created_at, Once.CreatedAt,
     source: :event_id,
     nonce_type: :sortable,
-    epoch: ~U[2025-01-01 00:00:00Z],
     writable: :never
 end
 ```
 
-The epoch and database options must match the ID's configuration. This is ID
-generation time, not necessarily insertion time; exposing it for masked IDs
-reveals their generation time. See `Once.CreatedAt` for schema options and
-limitations. This type requires Ecto 3.12 or later.
+The epoch defaults to 2025-01-01 00:00:00 UTC; pass `epoch:` if the generator
+uses a different epoch. The epoch and database options must match the ID's
+configuration. This is ID generation time, not necessarily insertion time;
+exposing it for masked IDs reveals their generation time. See `Once.CreatedAt`
+for schema options and limitations. This type requires Ecto 3.12 or later.
 
 ## Compatibility
 

@@ -188,27 +188,32 @@ defmodule Once do
 
   ## Ecto Schema Integration
 
-  The recommended approach is to define a base schema module that centralises your Once configuration. This way you only need to change Once options in one place:
+  The recommended approach is to define a base schema module that centralises your Once configuration. This example uses sortable IDs so their generation time can also be exposed with `Once.CreatedAt`:
 
       defmodule MyApp.Schema do
         defmacro __using__(_) do
           quote do
             use Ecto.Schema
 
-            @once_opts [ex_format: :hex32]
+            @once_opts [ex_format: :hex32, nonce_type: :sortable]
+            @created_at_opts @once_opts ++ [writable: :never, source: :id]
             @primary_key {:id, Once, [autogenerate: true] ++ @once_opts}
             @foreign_key_type Once
           end
         end
       end
 
-  Note that `@foreign_key_type` sets the type module but not the params (format, prefix, etc.), so `@once_opts` must also be passed to each `belongs_to`. You can merge in field-specific overrides with `++`:
+  `@foreign_key_type` sets the type module but not the params (format, prefix, etc.), so `@once_opts` must also be passed to each `belongs_to`. Pass `@created_at_opts` to `Once.CreatedAt` fields.
 
       defmodule MyApp.Transaction do
         use MyApp.Schema
 
         schema "transactions" do
+          field :created_at, Once.CreatedAt, @created_at_opts
+
           belongs_to :user, MyApp.User, @once_opts
+          # you can even do this
+          field :user_created_at, Once.CreatedAt, Keyword.put(@created_at_opts, :source, :user_id)
           belongs_to :other, MyApp.User, @once_opts ++ [on_replace: :nilify]
         end
       end

@@ -3,17 +3,14 @@ defmodule Once.CreatedAt do
   A read-only Ecto type exposing the generation time of a sortable Once ID.
 
   Map the field to the same database column as the ID and provide the same
-  Once options, together with the epoch used by its NoNoncense instance:
+  Once options:
 
       @once_opts [nonce_type: :sortable]
-      @epoch ~U[2025-01-01 00:00:00Z]
-
       schema "posts" do
         field :event_id, Once, @once_opts
         field :event_created_at, Once.CreatedAt,
           @once_opts ++ [
             source: :event_id,
-            epoch: @epoch,
             writable: :never,
             on_writable_violation: :raise
           ]
@@ -22,19 +19,25 @@ defmodule Once.CreatedAt do
   This type requires Ecto 3.12 or later for read-only schema fields. The
   `on_writable_violation` option in the example requires Ecto 3.14.1 or later.
 
-  The epoch can be a `DateTime` with millisecond precision or an integer Unix
-  timestamp in milliseconds. It must match the epoch used to generate the IDs.
+  The epoch defaults to the NoNoncense default, 2025-01-01 00:00:00 UTC. If the
+  generator uses a different epoch, pass it as `epoch:`, either as a `DateTime`
+  with millisecond precision or an integer Unix timestamp in milliseconds. It
+  must match the epoch used to generate the IDs.
   The timestamp represents ID generation time, not database insertion time.
   Only sortable IDs are supported; masked sortable IDs are stored unmasked and
   are supported. Database format and persisted prefix options must match the ID.
 
   The field is populated when loaded from the database, not automatically when
-  the ID is generated or inserted. Schema fields must specify `writable: :never`;
-  use `on_writable_violation: :raise` to reject attempted writes explicitly.
+  the ID is generated or inserted.
+  On Postgres, you can set `read_after_writes: true` on the field to have the value available immediately
+   (it uses "RETURNING" so there isn't even an extra read query).
+  Schema fields must specify `writable: :never`; use `on_writable_violation: :raise` to reject attempted writes explicitly.
   Use `Once.Query` macros to filter on this field or the original ID field:
 
       from p in Post,
         where: gte(p.event_created_at, ^start_time) and lt(p.event_created_at, ^end_time)
+
+  Use `eq(p.event_created_at, ^timestamp)` to match the timestamp's millisecond.
 
   The query module's epoch must match this field's epoch. Direct comparisons
   against interpolated timestamps are rejected: comparing a timestamp with the
@@ -42,6 +45,7 @@ defmodule Once.CreatedAt do
   """
 
   use Ecto.ParameterizedType
+  use Once.Constants
   alias Once.{Parse, Prefix}
   alias Once.Query.Boundary
 
@@ -51,7 +55,7 @@ defmodule Once.CreatedAt do
       raise ArgumentError, "Once.CreatedAt fields require writable: :never"
     end
 
-    epoch = opts |> Keyword.fetch!(:epoch) |> Boundary.to_unix_ms!("epoch")
+    epoch = opts |> Keyword.get(:epoch, @default_epoch) |> Boundary.to_unix_ms!("epoch")
     params = opts |> Keyword.delete(:epoch) |> Once.init()
 
     if params.nonce_type != :sortable do

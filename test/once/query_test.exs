@@ -6,6 +6,10 @@ defmodule Once.QueryTest.DateTimeEpochQuery do
   use Once.Query, epoch: ~U[2020-01-01 00:00:00Z]
 end
 
+defmodule Once.QueryTest.DefaultEpochQuery do
+  use Once.Query
+end
+
 defmodule Once.QueryTest.Schema do
   use Ecto.Schema
 
@@ -21,17 +25,44 @@ defmodule Once.QueryTest do
   import Once.QueryTest.IDQuery
   alias Once.QueryTest.Schema
 
-  test "documents the macros supplied by use" do
+  test "documents the default query macros" do
     assert {:docs_v1, _, _, _, _, _, entries} = Code.fetch_docs(Once.Query)
 
-    for name <- [:lt, :gte, :gt, :lte] do
+    for name <- [:lt, :gte, :gt, :lte, :eq] do
       assert Enum.any?(entries, fn
-               {{:macrocallback, ^name, 2}, _, _, %{"en" => doc}, _} ->
+               {{:macro, ^name, 2}, _, _, %{"en" => doc}, _} ->
                  is_binary(doc) and doc != ""
 
                _ ->
                  false
              end)
+    end
+  end
+
+  test "direct macros use the default epoch" do
+    require Once.Query
+    time = ~U[2025-01-01 00:00:00.010Z]
+    type = Schema.__schema__(:type, :sortable)
+
+    queries = [
+      {from(row in Schema, where: Once.Query.lt(row.sortable, ^time)), [10]},
+      {from(row in Schema, where: Once.Query.gte(row.sortable, ^time)), [10]},
+      {from(row in Schema, where: Once.Query.gt(row.sortable, ^time)), [11]},
+      {from(row in Schema, where: Once.Query.lte(row.sortable, ^time)), [11]},
+      {from(row in Schema, where: Once.Query.eq(row.sortable, ^time)), [10, 11]}
+    ]
+
+    for {query, milliseconds} <- queries do
+      [%{params: params}] = query.wheres
+
+      dumped =
+        Enum.map(params, fn {value, _} ->
+          assert {:ok, cast} = Ecto.Type.cast(type, value)
+          assert {:ok, result} = Ecto.Type.dump(type, cast)
+          result
+        end)
+
+      assert dumped == Enum.map(milliseconds, &(&1 * 4_194_304))
     end
   end
 
@@ -53,6 +84,46 @@ defmodule Once.QueryTest do
       end)
 
     assert dumped == [10 * 4_194_304, 11 * 4_194_304]
+  end
+
+  test "uses the NoNoncense default epoch when none is configured" do
+    require Once.QueryTest.DefaultEpochQuery
+    time = ~U[2025-01-01 00:00:00.010Z]
+
+    query =
+      from row in Schema,
+        where: Once.QueryTest.DefaultEpochQuery.gte(row.sortable, ^time)
+
+    [%{params: [{value, _}]}] = query.wheres
+    type = Schema.__schema__(:type, :sortable)
+    assert {:ok, cast} = Ecto.Type.cast(type, value)
+    assert {:ok, 10 * 4_194_304} == Ecto.Type.dump(type, cast)
+
+    created_at = Once.CreatedAt.init(epoch: ~U[2025-01-01 00:00:00Z], nonce_type: :sortable)
+    assert {:ok, boundary} = Once.CreatedAt.cast(value, created_at)
+    assert {:ok, 10 * 4_194_304} == Once.CreatedAt.dump(boundary, nil, created_at)
+  end
+
+  test "equality spans the full millisecond" do
+    time = ~U[2020-01-01 00:00:00.010Z]
+    type = Schema.__schema__(:type, :sortable)
+    created_at = Once.CreatedAt.init(epoch: ~U[2020-01-01 00:00:00Z], nonce_type: :sortable)
+
+    for timestamp <- [time, DateTime.to_unix(time, :millisecond)] do
+      query = from row in Schema, where: eq(row.sortable, ^timestamp)
+      [%{expr: {:and, _, [{:>=, _, _}, {:<, _, _}]}, params: params}] = query.wheres
+
+      dumped =
+        Enum.map(params, fn {value, _} ->
+          assert {:ok, cast} = Ecto.Type.cast(type, value)
+          assert {:ok, result} = Ecto.Type.dump(type, cast)
+          assert {:ok, boundary} = Once.CreatedAt.cast(value, created_at)
+          assert {:ok, ^result} = Once.CreatedAt.dump(boundary, nil, created_at)
+          result
+        end)
+
+      assert dumped == [10 * 4_194_304, 11 * 4_194_304]
+    end
   end
 
   test "accepts a DateTime epoch" do
@@ -88,6 +159,19 @@ defmodule Once.QueryDbTest.IDQuery do
   use Once.Query, epoch: 1_735_689_600_000
 end
 
+defmodule Once.QueryDirectTest do
+  use ExUnit.Case, async: true
+  import Ecto.Query
+  import Once.Query
+  alias Once.QueryTest.Schema
+
+  test "imports default macros into Ecto expressions" do
+    time = ~U[2025-01-01 00:00:00.010Z]
+    query = from row in Schema, where: eq(row.sortable, ^time)
+    assert [%{expr: {:and, _, [{:>=, _, _}, {:<, _, _}]}}] = query.wheres
+  end
+end
+
 defmodule Once.QueryDbTest.Schema do
   use Ecto.Schema
 
@@ -111,6 +195,7 @@ defmodule Once.QueryDbTest do
   alias Once.QueryDbTest.Schema
 
   test "composes timestamp predicates, including joined fields, on both adapters" do
+    require Once.Query
     epoch = ~U[2025-01-01 00:00:00.000Z]
     time = DateTime.add(epoch, 10, :millisecond)
     end_time = DateTime.add(epoch, 20, :millisecond)
@@ -145,6 +230,13 @@ defmodule Once.QueryDbTest do
         {from(row in Schema, where: gte(row.bigint_id, ^unix_time)), Enum.drop(values, 1)},
         {from(row in Schema, where: gt(row.bigint_id, ^unix_time)), Enum.drop(values, 3)},
         {from(row in Schema, where: lte(row.bigint_id, ^unix_time)), Enum.take(values, 3)},
+        {from(row in Schema, where: eq(row.bigint_id, ^time)), Enum.slice(values, 1, 2)},
+        {from(row in Schema, where: Once.Query.lt(row.bigint_id, ^time)), Enum.take(values, 1)},
+        {from(row in Schema, where: Once.Query.gte(row.bigint_id, ^time)), Enum.drop(values, 1)},
+        {from(row in Schema, where: Once.Query.gt(row.bigint_id, ^time)), Enum.drop(values, 3)},
+        {from(row in Schema, where: Once.Query.lte(row.bigint_id, ^time)), Enum.take(values, 3)},
+        {from(row in Schema, where: Once.Query.eq(row.bigint_id, ^time)),
+         Enum.slice(values, 1, 2)},
         {from(row in Schema,
            where: gte(row.autogenerated, ^time) and lte(row.autogenerated, ^time)
          ), Enum.slice(values, 1, 2)},

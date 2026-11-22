@@ -42,7 +42,10 @@ defmodule Once.CreatedAtTest do
       Once.CreatedAt.init(epoch: @epoch, nonce_type: :encrypted)
     end
 
-    assert_raise KeyError, fn -> Once.CreatedAt.init(nonce_type: :sortable) end
+    assert_raise ArgumentError, ~r/epoch must be a DateTime or Unix millisecond integer/, fn ->
+      Once.CreatedAt.init(epoch: nil, nonce_type: :sortable)
+    end
+
     assert {:ok, nil} = Once.CreatedAt.load(nil, nil, params)
     assert :error = Once.CreatedAt.load("invalid", nil, params)
     assert :error = Once.CreatedAt.cast(@epoch, params)
@@ -52,6 +55,17 @@ defmodule Once.CreatedAtTest do
     assert_raise ArgumentError, ~r/require writable: :never/, fn ->
       Once.CreatedAt.init(schema: __MODULE__, epoch: @epoch, nonce_type: :sortable)
     end
+  end
+
+  test "uses the default epoch unless a custom epoch is configured" do
+    raw = <<10::42, 0::22>>
+    value = Once.to_format!(raw, :signed)
+    params = Once.CreatedAt.init(nonce_type: :sortable)
+    assert {:ok, ~U[2025-01-01 00:00:00.010Z]} = Once.CreatedAt.load(value, nil, params)
+
+    custom_epoch = ~U[2020-01-01 00:00:00Z]
+    params = Once.CreatedAt.init(epoch: custom_epoch, nonce_type: :sortable)
+    assert {:ok, ~U[2020-01-01 00:00:00.010Z]} = Once.CreatedAt.load(value, nil, params)
   end
 
   test "accepts query boundaries only with the matching epoch" do
@@ -79,7 +93,6 @@ defmodule Once.CreatedAtTest do
     for masked <- [false, true] do
       params =
         Once.CreatedAt.init(
-          epoch: @epoch,
           nonce_type: :sortable,
           ex_format: :signed,
           db_format: :hex,
@@ -215,6 +228,8 @@ defmodule Once.CreatedAtDbTest do
           {from(row in Schema, where: gt(field(row, ^field), ^start_time)), Enum.drop(values, 3)},
           {from(row in Schema, where: lte(field(row, ^field), ^start_time)),
            Enum.take(values, 3)},
+          {from(row in Schema, where: eq(field(row, ^field), ^start_time)),
+           Enum.slice(values, 1, 2)},
           {from(row in Schema,
              where: gte(field(row, ^field), ^start_time) and lt(field(row, ^field), ^end_time)
            ), Enum.slice(values, 1, 3)}

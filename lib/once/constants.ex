@@ -3,6 +3,8 @@ defmodule Once.Constants do
 
   defmacro __using__(_opts \\ []) do
     quote do
+      @default_epoch DateTime.to_unix(~U[2025-01-01 00:00:00Z], :millisecond)
+
       @bigint_size Integer.pow(2, 64)
       @signed_min -Integer.pow(2, 63)
       @signed_max Integer.pow(2, 63) - 1

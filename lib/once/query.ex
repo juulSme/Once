@@ -2,27 +2,30 @@ defmodule Once.Query do
   @moduledoc """
   Ecto query expression macros for the generation time of sortable Once IDs.
 
-  Define a module with the epoch used by your NoNoncense instance, expressed
-  as Unix milliseconds or a millisecond-precision `DateTime`, and import it where
-  you build queries:
+  ## Default epoch
 
-      defmodule MyApp.IDQuery do
-        use Once.Query, epoch: 1_735_689_600_000
-      end
+  Import `Once.Query` to use the NoNoncense default epoch, 2025-01-01 00:00:00 UTC:
 
       import Ecto.Query
-      import MyApp.IDQuery
-
+      import Once.Query
       from p in Post, where: gte(p.id, ^start_time) and lt(p.id, ^end_time)
-      from p in Post, where: gte(p.id, ^timestamp) and lte(p.id, ^timestamp)
+      from p in Post, where: eq(p.id, ^timestamp)
+
+  ## Custom epoch
+
+  If your instance uses a different epoch, define and import a query module:
+
+      defmodule MyApp.IDQuery do
+        use Once.Query, epoch: ~U[2020-01-01 00:00:00Z]
+      end
+
+      import MyApp.IDQuery
+      from p in Post, where: gte(p.id, ^start_time)
+
+  The epoch can be Unix milliseconds or a millisecond-precision `DateTime`.
 
   The macros accept `DateTime` values or integer Unix milliseconds interpolated
   with Ecto's `^` syntax. DateTimes must not have a sub-millisecond component.
-  `gt/2` and `lte/2` provide exclusive lower and inclusive upper
-  bounds, respectively.
-
-  In the comparisons below, `id` means the ID's generation timestamp, not its
-  numeric value.
 
   These macros also work with joined schema bindings. The field must be a `Once`
   or `Once.CreatedAt` type configured with `nonce_type: :sortable`; masked IDs
@@ -36,52 +39,65 @@ defmodule Once.Query do
   including the upper boundary of the last representable millisecond.
   """
 
-  @lt_doc "Matches IDs generated strictly before the timestamp: `id < timestamp`."
-  @gte_doc "Matches IDs generated at or after the timestamp: `id >= timestamp`."
-  @gt_doc "Matches IDs generated strictly after the timestamp: `id > timestamp`."
-  @lte_doc "Matches IDs generated at or before the timestamp: `id <= timestamp`."
+  use Once.Constants
+
+  @lt_doc "Matches IDs generated strictly before the timestamp: `id-created-at < timestamp`."
+  @gte_doc "Matches IDs generated at or after the timestamp: `id-created-at >= timestamp`."
+  @gt_doc "Matches IDs generated strictly after the timestamp: `id-created-at > timestamp`."
+  @lte_doc "Matches IDs generated at or before the timestamp: `id-created-at <= timestamp`."
+  @eq_doc """
+  Matches IDs generated in the timestamp's millisecond: `id-created-at == timestamp`.
+  The timestamp expression is evaluated twice, so bind it to a variable first if
+  evaluating it more than once could produce different values:
+
+      now = DateTime.utc_now()
+      where(query, [r], eq(r.id, ^now))
+  """
 
   @doc @lt_doc
-  @macrocallback lt(field :: Macro.t(), timestamp :: Macro.t()) :: Macro.t()
+  defmacro lt(field, timestamp), do: build(:lt, field, timestamp, @default_epoch)
 
   @doc @gte_doc
-  @macrocallback gte(field :: Macro.t(), timestamp :: Macro.t()) :: Macro.t()
+  defmacro gte(field, timestamp), do: build(:gte, field, timestamp, @default_epoch)
 
   @doc @gt_doc
-  @macrocallback gt(field :: Macro.t(), timestamp :: Macro.t()) :: Macro.t()
+  defmacro gt(field, timestamp), do: build(:gt, field, timestamp, @default_epoch)
 
   @doc @lte_doc
-  @macrocallback lte(field :: Macro.t(), timestamp :: Macro.t()) :: Macro.t()
+  defmacro lte(field, timestamp), do: build(:lte, field, timestamp, @default_epoch)
+
+  @doc @eq_doc
+  defmacro eq(field, timestamp), do: build(:eq, field, timestamp, @default_epoch)
 
   defmacro __using__(opts) do
-    epoch = Keyword.fetch!(opts, :epoch)
+    epoch = Keyword.get(opts, :epoch, @default_epoch)
 
     quote do
-      @behaviour Once.Query
       @once_query_epoch Once.Query.Boundary.to_unix_ms!(unquote(epoch), "epoch")
 
       @doc unquote(@lt_doc)
-      @impl true
       defmacro lt(field, timestamp) do
         Once.Query.build(:lt, field, timestamp, @once_query_epoch)
       end
 
       @doc unquote(@gte_doc)
-      @impl true
       defmacro gte(field, timestamp) do
         Once.Query.build(:gte, field, timestamp, @once_query_epoch)
       end
 
       @doc unquote(@gt_doc)
-      @impl true
       defmacro gt(field, timestamp) do
         Once.Query.build(:gt, field, timestamp, @once_query_epoch)
       end
 
       @doc unquote(@lte_doc)
-      @impl true
       defmacro lte(field, timestamp) do
         Once.Query.build(:lte, field, timestamp, @once_query_epoch)
+      end
+
+      @doc unquote(@eq_doc)
+      defmacro eq(field, timestamp) do
+        Once.Query.build(:eq, field, timestamp, @once_query_epoch)
       end
     end
   end
@@ -96,6 +112,7 @@ defmodule Once.Query do
       :gte -> quote do: unquote(field) >= unquote(lower)
       :gt -> quote do: unquote(field) >= unquote(upper)
       :lte -> quote do: unquote(field) < unquote(upper)
+      :eq -> quote do: unquote(field) >= unquote(lower) and unquote(field) < unquote(upper)
     end
   end
 
