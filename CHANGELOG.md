@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0]
+
+- Add `Once.Query` macros for filtering sortable IDs by generation time, including equality and custom epochs.
+- Add `Once.CreatedAt`, a read-only Ecto type for exposing a sortable ID's generation time as a `DateTime`. Requires Ecto 3.12 or later.
+
 ## [2.0.0]
 
 - Add NoNoncense 2.0 compatibility and adapt getting started guides.
