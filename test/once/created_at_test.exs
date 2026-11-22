@@ -194,19 +194,29 @@ defmodule Once.CreatedAtDbTest do
     end
   end
 
+  defp take_at(list, indices) do
+    list
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {v, i} -> if i in indices, do: [v], else: [] end)
+  end
+
   test "query macros filter derived timestamps across database formats" do
     require Once.CreatedAtDbTest.WrongEpochQuery
     epoch = 1_735_689_600_000
     start_time = DateTime.from_unix!(epoch + 10, :millisecond)
     end_time = epoch + 20
 
-    values = [
-      9 * 4_194_304,
-      10 * 4_194_304,
-      10 * 4_194_304 + 8_192,
-      11 * 4_194_304,
-      20 * 4_194_304
-    ]
+    values =
+      for {milliseconds, machine_id, counter} <- [
+            {9, 0, 0},
+            {10, 0, 0},
+            {10, 1, 0},
+            {11, 0, 0},
+            {20, 0, 0}
+          ] do
+        <<value::unsigned-64>> = <<milliseconds::42, machine_id::9, counter::13>>
+        value
+      end
 
     for repo <- [MyApp.PgRepo, MyApp.MysqlRepo] do
       rows =
@@ -222,17 +232,19 @@ defmodule Once.CreatedAtDbTest do
 
       for field <- [:bigint_created_at, :bin_created_at, :string_created_at] do
         queries = [
-          {from(row in Schema, where: lt(field(row, ^field), ^start_time)), Enum.take(values, 1)},
+          {from(row in Schema, where: lt(field(row, ^field), ^start_time)),
+           take_at(values, 0..0)},
           {from(row in Schema, where: gte(field(row, ^field), ^start_time)),
-           Enum.drop(values, 1)},
-          {from(row in Schema, where: gt(field(row, ^field), ^start_time)), Enum.drop(values, 3)},
+           take_at(values, 1..4)},
+          {from(row in Schema, where: gt(field(row, ^field), ^start_time)),
+           take_at(values, 3..4)},
           {from(row in Schema, where: lte(field(row, ^field), ^start_time)),
-           Enum.take(values, 3)},
+           take_at(values, 0..2)},
           {from(row in Schema, where: eq(field(row, ^field), ^start_time)),
-           Enum.slice(values, 1, 2)},
+           take_at(values, 1..2)},
           {from(row in Schema,
              where: gte(field(row, ^field), ^start_time) and lt(field(row, ^field), ^end_time)
-           ), Enum.slice(values, 1, 3)}
+           ), take_at(values, 1..3)}
         ]
 
         for {query, expected} <- queries do
