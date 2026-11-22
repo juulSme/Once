@@ -121,7 +121,8 @@ The epoch defaults to 2025-01-01 00:00:00 UTC; pass `epoch:` if the generator
 uses a different epoch. The epoch and database options must match the ID's
 configuration. This is ID generation time, not necessarily insertion time;
 exposing it for masked IDs reveals their generation time. See `Once.CreatedAt`
-for schema options and limitations. This type requires Ecto 3.12 or later.
+for schema options and limitations. Ecto 3.12 or later is recommended, as it enforces the read-only
+field; older versions work as long as the field is never set.
 
 ## Compatibility
 

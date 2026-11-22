@@ -212,7 +212,7 @@ defmodule Once do
           field :created_at, Once.CreatedAt, @created_at_opts
 
           belongs_to :user, MyApp.User, @once_opts
-          # you can even do this
+          # Once.CreatedAt can also be used for foreign key fields
           field :user_created_at, Once.CreatedAt, Keyword.put(@created_at_opts, :source, :user_id)
           belongs_to :other, MyApp.User, @once_opts ++ [on_replace: :nilify]
         end

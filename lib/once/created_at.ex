@@ -16,8 +16,10 @@ defmodule Once.CreatedAt do
           ]
       end
 
-  This type requires Ecto 3.12 or later for read-only schema fields. The
-  `on_writable_violation` option in the example requires Ecto 3.14.1 or later.
+  Ecto 3.12 or later is recommended: it enforces `writable: :never` for read-only
+  schema fields. Older versions ignore the option, so the field works only as long
+  as it is never set. The `on_writable_violation` option in the example requires
+  Ecto 3.14.1 or later.
 
   The epoch defaults to the NoNoncense default, 2025-01-01 00:00:00 UTC. If the
   generator uses a different epoch, pass it as `epoch:`, either as a `DateTime`
@@ -29,8 +31,7 @@ defmodule Once.CreatedAt do
 
   The field is populated when loaded from the database, not automatically when
   the ID is generated or inserted.
-  On Postgres, you can set `read_after_writes: true` on the field to have the value available immediately
-   (it uses "RETURNING" so there isn't even an extra read query).
+  On Postgres, you can set `read_after_writes: true` on the field to have the value available immediately (it uses "RETURNING" so there isn't even an extra read query).
   Schema fields must specify `writable: :never`; use `on_writable_violation: :raise` to reject attempted writes explicitly.
   Use `Once.Query` macros to filter on this field or the original ID field:
 
