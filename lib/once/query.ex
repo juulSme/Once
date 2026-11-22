@@ -47,8 +47,10 @@ defmodule Once.Query do
   @lte_doc "Matches IDs generated at or before the timestamp: `id-created-at <= timestamp`."
   @eq_doc """
   Matches IDs generated in the timestamp's millisecond: `id-created-at == timestamp`.
-  The timestamp expression is evaluated twice, so bind it to a variable first if
-  evaluating it more than once could produce different values:
+
+  The interpolated timestamp is used for both bounds of the range, so it must be a
+  variable, literal, module attribute, or field access on a variable; any other
+  expression is rejected at compile time. Bind it to a variable first:
 
       now = DateTime.utc_now()
       where(query, [r], eq(r.id, ^now))
@@ -104,6 +106,12 @@ defmodule Once.Query do
 
   @doc false
   def build(operation, field, {:^, _, [timestamp]}, epoch) do
+    if operation == :eq and not simple?(timestamp) do
+      raise ArgumentError,
+            "eq/2 interpolates the timestamp twice, so it must be a variable, literal, " <>
+              "module attribute or field access; bind other expressions to a variable first"
+    end
+
     lower = boundary_ast(timestamp, epoch, 0)
     upper = boundary_ast(timestamp, epoch, 1)
 
@@ -119,6 +127,17 @@ defmodule Once.Query do
   def build(_, _, _, _) do
     raise ArgumentError, "timestamp must be interpolated with ^"
   end
+
+  defp simple?(timestamp) when is_integer(timestamp), do: true
+  defp simple?({name, _, context}) when is_atom(name) and is_atom(context), do: true
+  defp simple?({:@, _, [{name, _, context}]}) when is_atom(name) and is_atom(context), do: true
+  defp simple?({sigil, _, [{:<<>>, _, _}, _]}) when sigil in [:sigil_U, :sigil_u], do: true
+
+  defp simple?({{:., _, [{name, _, context}, key]}, meta, []})
+       when is_atom(name) and is_atom(context) and is_atom(key),
+       do: Keyword.get(meta, :no_parens, false)
+
+  defp simple?(_), do: false
 
   defp boundary_ast(timestamp, epoch, offset) do
     quote do

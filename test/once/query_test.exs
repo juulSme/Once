@@ -148,6 +148,18 @@ defmodule Once.QueryTest do
     end
   end
 
+  test "eq only accepts side-effect free timestamp expressions" do
+    for ok <- ["time", "1_000", "@time", "opts.time", "~U[2025-01-01 00:00:00.010Z]"] do
+      assert Macro.expand(Code.string_to_quoted!("eq(row.sortable, ^#{ok})"), __ENV__)
+    end
+
+    for bad <- ["DateTime.utc_now()", "now()", "opts.time()", "time + 1"] do
+      assert_raise ArgumentError, ~r/interpolates the timestamp twice/, fn ->
+        Macro.expand(Code.string_to_quoted!("eq(row.sortable, ^(#{bad}))"), __ENV__)
+      end
+    end
+  end
+
   test "requires timestamps to use Ecto interpolation" do
     assert_raise ArgumentError, ~r/interpolated with \^/, fn ->
       Macro.expand(quote(do: lt(row.sortable, time)), __ENV__)
