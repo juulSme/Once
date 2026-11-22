@@ -97,7 +97,7 @@ end
 import Ecto.Query
 import MyApp.IDQuery
 
-from p in MyApp.Post, where: since(p.id, ^start_time) and before(p.id, ^end_time)
+from p in MyApp.Post, where: gte(p.id, ^start_time) and lt(p.id, ^end_time)
 ```
 
 The epoch and timestamps can be `DateTime`s or integer Unix milliseconds. See
