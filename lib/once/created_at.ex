@@ -36,9 +36,9 @@ defmodule Once.CreatedAt do
   Use `Once.Query` macros to filter on this field or the original ID field:
 
       from p in Post,
-        where: gte(p.event_created_at, ^start_time) and lt(p.event_created_at, ^end_time)
+        where: later_or_at(p.event_created_at, ^start_time) and earlier_than(p.event_created_at, ^end_time)
 
-  Use `eq(p.event_created_at, ^timestamp)` to match the timestamp's millisecond.
+  Use `at(p.event_created_at, ^timestamp)` to match the timestamp's millisecond.
 
   The query module's epoch must match this field's epoch. Direct comparisons
   against interpolated timestamps are rejected: comparing a timestamp with the

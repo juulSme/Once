@@ -232,18 +232,20 @@ defmodule Once.CreatedAtDbTest do
 
       for field <- [:bigint_created_at, :bin_created_at, :string_created_at] do
         queries = [
-          {from(row in Schema, where: lt(field(row, ^field), ^start_time)),
+          {from(row in Schema, where: earlier_than(field(row, ^field), ^start_time)),
            take_at(values, 0..0)},
-          {from(row in Schema, where: gte(field(row, ^field), ^start_time)),
+          {from(row in Schema, where: later_or_at(field(row, ^field), ^start_time)),
            take_at(values, 1..4)},
-          {from(row in Schema, where: gt(field(row, ^field), ^start_time)),
+          {from(row in Schema, where: later_than(field(row, ^field), ^start_time)),
            take_at(values, 3..4)},
-          {from(row in Schema, where: lte(field(row, ^field), ^start_time)),
+          {from(row in Schema, where: earlier_or_at(field(row, ^field), ^start_time)),
            take_at(values, 0..2)},
-          {from(row in Schema, where: eq(field(row, ^field), ^start_time)),
+          {from(row in Schema, where: at(field(row, ^field), ^start_time)),
            take_at(values, 1..2)},
           {from(row in Schema,
-             where: gte(field(row, ^field), ^start_time) and lt(field(row, ^field), ^end_time)
+             where:
+               later_or_at(field(row, ^field), ^start_time) and
+                 earlier_than(field(row, ^field), ^end_time)
            ), take_at(values, 1..3)}
         ]
 
@@ -261,7 +263,8 @@ defmodule Once.CreatedAtDbTest do
 
       query =
         from row in Schema,
-          where: Once.CreatedAtDbTest.WrongEpochQuery.gte(row.bigint_created_at, ^start_time)
+          where:
+            Once.CreatedAtDbTest.WrongEpochQuery.later_or_at(row.bigint_created_at, ^start_time)
 
       assert_raise ArgumentError, ~r/query epoch does not match field epoch/, fn ->
         repo.all(query)

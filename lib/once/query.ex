@@ -8,8 +8,8 @@ defmodule Once.Query do
 
       import Ecto.Query
       import Once.Query
-      from p in Post, where: gte(p.id, ^start_time) and lt(p.id, ^end_time)
-      from p in Post, where: eq(p.id, ^timestamp)
+      from p in Post, where: later_or_at(p.id, ^start_time) and earlier_than(p.id, ^end_time)
+      from p in Post, where: at(p.id, ^timestamp)
 
   ## Custom epoch
 
@@ -20,7 +20,7 @@ defmodule Once.Query do
       end
 
       import MyApp.IDQuery
-      from p in Post, where: gte(p.id, ^start_time)
+      from p in Post, where: later_or_at(p.id, ^start_time)
 
   The epoch can be Unix milliseconds or a millisecond-precision `DateTime`.
 
@@ -53,23 +53,23 @@ defmodule Once.Query do
   expression is rejected at compile time. Bind it to a variable first:
 
       now = DateTime.utc_now()
-      where(query, [r], eq(r.id, ^now))
+      where(query, [r], at(r.id, ^now))
   """
 
   @doc @lt_doc
-  defmacro lt(field, timestamp), do: build(:lt, field, timestamp, @default_epoch)
+  defmacro earlier_than(field, timestamp), do: build(:lt, field, timestamp, @default_epoch)
 
   @doc @gte_doc
-  defmacro gte(field, timestamp), do: build(:gte, field, timestamp, @default_epoch)
+  defmacro later_or_at(field, timestamp), do: build(:gte, field, timestamp, @default_epoch)
 
   @doc @gt_doc
-  defmacro gt(field, timestamp), do: build(:gt, field, timestamp, @default_epoch)
+  defmacro later_than(field, timestamp), do: build(:gt, field, timestamp, @default_epoch)
 
   @doc @lte_doc
-  defmacro lte(field, timestamp), do: build(:lte, field, timestamp, @default_epoch)
+  defmacro earlier_or_at(field, timestamp), do: build(:lte, field, timestamp, @default_epoch)
 
   @doc @eq_doc
-  defmacro eq(field, timestamp), do: build(:eq, field, timestamp, @default_epoch)
+  defmacro at(field, timestamp), do: build(:eq, field, timestamp, @default_epoch)
 
   defmacro __using__(opts) do
     epoch = Keyword.get(opts, :epoch, @default_epoch)
@@ -78,27 +78,27 @@ defmodule Once.Query do
       @once_query_epoch Once.Query.Boundary.to_unix_ms!(unquote(epoch), "epoch")
 
       @doc unquote(@lt_doc)
-      defmacro lt(field, timestamp) do
+      defmacro earlier_than(field, timestamp) do
         Once.Query.build(:lt, field, timestamp, @once_query_epoch)
       end
 
       @doc unquote(@gte_doc)
-      defmacro gte(field, timestamp) do
+      defmacro later_or_at(field, timestamp) do
         Once.Query.build(:gte, field, timestamp, @once_query_epoch)
       end
 
       @doc unquote(@gt_doc)
-      defmacro gt(field, timestamp) do
+      defmacro later_than(field, timestamp) do
         Once.Query.build(:gt, field, timestamp, @once_query_epoch)
       end
 
       @doc unquote(@lte_doc)
-      defmacro lte(field, timestamp) do
+      defmacro earlier_or_at(field, timestamp) do
         Once.Query.build(:lte, field, timestamp, @once_query_epoch)
       end
 
       @doc unquote(@eq_doc)
-      defmacro eq(field, timestamp) do
+      defmacro at(field, timestamp) do
         Once.Query.build(:eq, field, timestamp, @once_query_epoch)
       end
     end
@@ -108,7 +108,7 @@ defmodule Once.Query do
   def build(operation, field, {:^, _, [timestamp]}, epoch) do
     if operation == :eq and not simple?(timestamp) do
       raise ArgumentError,
-            "eq/2 interpolates the timestamp twice, so it must be a variable, literal, " <>
+            "at/2 interpolates the timestamp twice, so it must be a variable, literal, " <>
               "module attribute or field access; bind other expressions to a variable first"
     end
 

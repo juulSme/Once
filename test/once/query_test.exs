@@ -28,7 +28,7 @@ defmodule Once.QueryTest do
   test "documents the default query macros" do
     assert {:docs_v1, _, _, _, _, _, entries} = Code.fetch_docs(Once.Query)
 
-    for name <- [:lt, :gte, :gt, :lte, :eq] do
+    for name <- [:earlier_than, :later_or_at, :later_than, :earlier_or_at, :at] do
       assert Enum.any?(entries, fn
                {{:macro, ^name, 2}, _, _, %{"en" => doc}, _} ->
                  is_binary(doc) and doc != ""
@@ -45,11 +45,11 @@ defmodule Once.QueryTest do
     type = Schema.__schema__(:type, :sortable)
 
     queries = [
-      {from(row in Schema, where: Once.Query.lt(row.sortable, ^time)), [10]},
-      {from(row in Schema, where: Once.Query.gte(row.sortable, ^time)), [10]},
-      {from(row in Schema, where: Once.Query.gt(row.sortable, ^time)), [11]},
-      {from(row in Schema, where: Once.Query.lte(row.sortable, ^time)), [11]},
-      {from(row in Schema, where: Once.Query.eq(row.sortable, ^time)), [10, 11]}
+      {from(row in Schema, where: Once.Query.earlier_than(row.sortable, ^time)), [10]},
+      {from(row in Schema, where: Once.Query.later_or_at(row.sortable, ^time)), [10]},
+      {from(row in Schema, where: Once.Query.later_than(row.sortable, ^time)), [11]},
+      {from(row in Schema, where: Once.Query.earlier_or_at(row.sortable, ^time)), [11]},
+      {from(row in Schema, where: Once.Query.at(row.sortable, ^time)), [10, 11]}
     ]
 
     for {query, milliseconds} <- queries do
@@ -71,7 +71,7 @@ defmodule Once.QueryTest do
 
     query =
       from row in Schema,
-        where: gte(row.custom_epoch, ^time) and lte(row.custom_epoch, ^time)
+        where: later_or_at(row.custom_epoch, ^time) and earlier_or_at(row.custom_epoch, ^time)
 
     type = Schema.__schema__(:type, :custom_epoch)
     [%{params: params}] = query.wheres
@@ -92,7 +92,7 @@ defmodule Once.QueryTest do
 
     query =
       from row in Schema,
-        where: Once.QueryTest.DefaultEpochQuery.gte(row.sortable, ^time)
+        where: Once.QueryTest.DefaultEpochQuery.later_or_at(row.sortable, ^time)
 
     [%{params: [{value, _}]}] = query.wheres
     type = Schema.__schema__(:type, :sortable)
@@ -110,7 +110,7 @@ defmodule Once.QueryTest do
     created_at = Once.CreatedAt.init(epoch: ~U[2020-01-01 00:00:00Z], nonce_type: :sortable)
 
     for timestamp <- [time, DateTime.to_unix(time, :millisecond)] do
-      query = from row in Schema, where: eq(row.sortable, ^timestamp)
+      query = from row in Schema, where: at(row.sortable, ^timestamp)
       [%{expr: {:and, _, [{:>=, _, _}, {:<, _, _}]}, params: params}] = query.wheres
 
       dumped =
@@ -132,7 +132,7 @@ defmodule Once.QueryTest do
 
     query =
       from row in Schema,
-        where: Once.QueryTest.DateTimeEpochQuery.gte(row.sortable, ^time)
+        where: Once.QueryTest.DateTimeEpochQuery.later_or_at(row.sortable, ^time)
 
     [%{params: [{value, _}]}] = query.wheres
     type = Schema.__schema__(:type, :sortable)
@@ -144,25 +144,25 @@ defmodule Once.QueryTest do
     sub_millisecond = ~U[2020-01-01 00:00:00.000001Z]
 
     assert_raise ArgumentError, ~r/timestamp must have millisecond precision/, fn ->
-      from row in Schema, where: lt(row.sortable, ^sub_millisecond)
+      from row in Schema, where: earlier_than(row.sortable, ^sub_millisecond)
     end
   end
 
-  test "eq only accepts side-effect free timestamp expressions" do
+  test "at only accepts side-effect free timestamp expressions" do
     for ok <- ["time", "1_000", "@time", "opts.time", "~U[2025-01-01 00:00:00.010Z]"] do
-      assert Macro.expand(Code.string_to_quoted!("eq(row.sortable, ^#{ok})"), __ENV__)
+      assert Macro.expand(Code.string_to_quoted!("at(row.sortable, ^#{ok})"), __ENV__)
     end
 
     for bad <- ["DateTime.utc_now()", "now()", "opts.time()", "time + 1"] do
       assert_raise ArgumentError, ~r/interpolates the timestamp twice/, fn ->
-        Macro.expand(Code.string_to_quoted!("eq(row.sortable, ^(#{bad}))"), __ENV__)
+        Macro.expand(Code.string_to_quoted!("at(row.sortable, ^(#{bad}))"), __ENV__)
       end
     end
   end
 
   test "requires timestamps to use Ecto interpolation" do
     assert_raise ArgumentError, ~r/interpolated with \^/, fn ->
-      Macro.expand(quote(do: lt(row.sortable, time)), __ENV__)
+      Macro.expand(quote(do: earlier_than(row.sortable, time)), __ENV__)
     end
   end
 end
@@ -179,7 +179,7 @@ defmodule Once.QueryDirectTest do
 
   test "imports default macros into Ecto expressions" do
     time = ~U[2025-01-01 00:00:00.010Z]
-    query = from row in Schema, where: eq(row.sortable, ^time)
+    query = from row in Schema, where: at(row.sortable, ^time)
     assert [%{expr: {:and, _, [{:>=, _, _}, {:<, _, _}]}}] = query.wheres
   end
 end
@@ -244,32 +244,42 @@ defmodule Once.QueryDbTest do
       repo.insert_all("test_table", rows)
 
       queries = [
-        {from(row in Schema, where: lt(row.bigint_id, ^time)), take_at(values, 0..0)},
-        {from(row in Schema, where: gte(row.bigint_id, ^time)), take_at(values, 1..4)},
-        {from(row in Schema, where: gt(row.bigint_id, ^time)), take_at(values, 3..4)},
-        {from(row in Schema, where: lte(row.bigint_id, ^time)), take_at(values, 0..2)},
-        {from(row in Schema, where: lt(row.bigint_id, ^unix_time)), take_at(values, 0..0)},
-        {from(row in Schema, where: gte(row.bigint_id, ^unix_time)), take_at(values, 1..4)},
-        {from(row in Schema, where: gt(row.bigint_id, ^unix_time)), take_at(values, 3..4)},
-        {from(row in Schema, where: lte(row.bigint_id, ^unix_time)), take_at(values, 0..2)},
-        {from(row in Schema, where: eq(row.bigint_id, ^time)), take_at(values, 1..2)},
-        {from(row in Schema, where: Once.Query.lt(row.bigint_id, ^time)), take_at(values, 0..0)},
-        {from(row in Schema, where: Once.Query.gte(row.bigint_id, ^time)), take_at(values, 1..4)},
-        {from(row in Schema, where: Once.Query.gt(row.bigint_id, ^time)), take_at(values, 3..4)},
-        {from(row in Schema, where: Once.Query.lte(row.bigint_id, ^time)), take_at(values, 0..2)},
-        {from(row in Schema, where: Once.Query.eq(row.bigint_id, ^time)), take_at(values, 1..2)},
+        {from(row in Schema, where: earlier_than(row.bigint_id, ^time)), take_at(values, 0..0)},
+        {from(row in Schema, where: later_or_at(row.bigint_id, ^time)), take_at(values, 1..4)},
+        {from(row in Schema, where: later_than(row.bigint_id, ^time)), take_at(values, 3..4)},
+        {from(row in Schema, where: earlier_or_at(row.bigint_id, ^time)), take_at(values, 0..2)},
+        {from(row in Schema, where: earlier_than(row.bigint_id, ^unix_time)),
+         take_at(values, 0..0)},
+        {from(row in Schema, where: later_or_at(row.bigint_id, ^unix_time)),
+         take_at(values, 1..4)},
+        {from(row in Schema, where: later_than(row.bigint_id, ^unix_time)),
+         take_at(values, 3..4)},
+        {from(row in Schema, where: earlier_or_at(row.bigint_id, ^unix_time)),
+         take_at(values, 0..2)},
+        {from(row in Schema, where: at(row.bigint_id, ^time)), take_at(values, 1..2)},
+        {from(row in Schema, where: Once.Query.earlier_than(row.bigint_id, ^time)),
+         take_at(values, 0..0)},
+        {from(row in Schema, where: Once.Query.later_or_at(row.bigint_id, ^time)),
+         take_at(values, 1..4)},
+        {from(row in Schema, where: Once.Query.later_than(row.bigint_id, ^time)),
+         take_at(values, 3..4)},
+        {from(row in Schema, where: Once.Query.earlier_or_at(row.bigint_id, ^time)),
+         take_at(values, 0..2)},
+        {from(row in Schema, where: Once.Query.at(row.bigint_id, ^time)), take_at(values, 1..2)},
         {from(row in Schema,
-           where: gte(row.autogenerated, ^time) and lte(row.autogenerated, ^time)
+           where:
+             later_or_at(row.autogenerated, ^time) and earlier_or_at(row.autogenerated, ^time)
          ), take_at(values, 1..2)},
         {from(row in Schema,
-           where: gte(row.string_id, ^time) and lt(row.string_id, ^end_time)
+           where: later_or_at(row.string_id, ^time) and earlier_than(row.string_id, ^end_time)
          ), take_at(values, 1..3)},
         {from(row in Schema,
            join: joined in Schema,
            on: joined.id == row.id,
            where:
-             lt(joined.bigint_id, ^time) or
-               (gte(joined.bigint_id, ^end_time) and lte(joined.bigint_id, ^end_time))
+             earlier_than(joined.bigint_id, ^time) or
+               (later_or_at(joined.bigint_id, ^end_time) and
+                  earlier_or_at(joined.bigint_id, ^end_time))
          ), take_at(values, [0, 4])}
       ]
 

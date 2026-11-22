@@ -93,8 +93,8 @@ by ID generation time:
 import Ecto.Query
 import Once.Query
 
-from p in MyApp.Post, where: gte(p.id, ^start_time) and lt(p.id, ^end_time)
-from p in MyApp.Post, where: eq(p.id, ^timestamp)
+from p in MyApp.Post, where: later_or_at(p.id, ^start_time) and earlier_than(p.id, ^end_time)
+from p in MyApp.Post, where: at(p.id, ^timestamp)
 ```
 
 The epoch defaults to 2025-01-01 00:00:00 UTC. If the generator uses a different
