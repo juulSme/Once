@@ -11,7 +11,8 @@ config :once, MyApp.MysqlRepo,
   username: "root",
   password: "supersecret",
   database: "no_noncense_test",
-  pool: Ecto.Adapters.SQL.Sandbox
+  pool: Ecto.Adapters.SQL.Sandbox,
+  socket_options: [nodelay: true]
 
 config :once, MyApp.PgRepo,
   host: "localhost",
@@ -19,4 +20,5 @@ config :once, MyApp.PgRepo,
   username: "postgres",
   password: "supersecret",
   database: "no_noncense_test",
-  pool: Ecto.Adapters.SQL.Sandbox
+  pool: Ecto.Adapters.SQL.Sandbox,
+  socket_options: [nodelay: true]
