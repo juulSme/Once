@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 - Implement `Once.equal?/3` to compare IDs by their underlying value across accepted formats in Ecto changesets, respecting configured prefixes and integer parsing rules.
 - Document the requirement to use one NoNoncense instance and nonce type for unique IDs.
 - Fix loading binary database formats when the Elixir format is an integer.
+- Reject stored IDs that do not decode to eight bytes in `Once.CreatedAt`.
 
 ## [2.1.0]
 

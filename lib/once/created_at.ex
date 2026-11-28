@@ -97,7 +97,7 @@ defmodule Once.CreatedAt do
 
     with {:ok, value} <- Prefix.strip(value, Prefix.if_persistent(params.prefix, params)),
          {:ok, value} <- Parse.maybe_parse_num_str(value, parse_num?),
-         {:ok, raw_nonce} <- to_raw(value, params.db_format) do
+         {:ok, <<_::64>> = raw_nonce} <- to_raw(value, params.db_format) do
       {:ok, NoNoncense.created_at(raw_nonce, params.epoch)}
     else
       _ -> :error

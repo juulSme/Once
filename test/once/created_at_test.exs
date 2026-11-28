@@ -85,6 +85,23 @@ defmodule Once.CreatedAtTest do
     end
   end
 
+  test "rejects short and oversized decoded IDs" do
+    for {format, value} <- [
+          {:raw, <<0::48>>},
+          {:raw, <<0::72>>},
+          {:hex, "000000000000"},
+          {:hex, "000000000000000000"}
+        ] do
+      params = Once.CreatedAt.init(nonce_type: :sortable, db_format: format)
+      assert :error = Once.CreatedAt.load(value, nil, params)
+    end
+  end
+
+  test "rejects raw IDs too short to contain a timestamp" do
+    params = Once.CreatedAt.init(nonce_type: :sortable, db_format: :raw)
+    assert :error = Once.CreatedAt.load(<<>>, nil, params)
+  end
+
   test "uses the default epoch unless a custom epoch is configured" do
     raw = <<10::42, 0::22>>
     value = Once.to_format!(raw, :signed)
