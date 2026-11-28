@@ -300,7 +300,7 @@ defmodule Once do
         if params.mask do
           Mask.to_masked_format(input, params.no_noncense, ex_fmt, false)
         else
-          convert(input, ex_fmt, ex_fmt in @int_formats)
+          convert(input, ex_fmt, false)
         end
       end
     end

@@ -252,6 +252,45 @@ defmodule Once.UnitTest do
   end
 
   describe "load/3" do
+    test "round-trips hex database values with an integer Elixir format" do
+      params = Once.init(ex_format: :unsigned, db_format: :hex)
+
+      for id <- [16, 26] do
+        assert {:ok, stored} = Once.dump(id, nil, params) |> IO.inspect()
+        assert {:ok, ^id} = Once.load(stored, nil, params)
+      end
+    end
+
+    test "round-trips binary database formats with integer Elixir formats" do
+      for ex_format <- [:signed, :unsigned],
+          db_format <- [:raw, :url64, :hex, :hex32],
+          prefix <- [nil, "id_"],
+          id <- [16, 26, 0x3132333435363738] do
+        params =
+          Once.init(
+            ex_format: ex_format,
+            db_format: db_format,
+            prefix: prefix,
+            persist_prefix: prefix != nil
+          )
+
+        value = Once.Prefix.put(id, prefix)
+        assert {:ok, stored} = Once.dump(value, nil, params)
+        assert {:ok, ^value} = Once.load(stored, nil, params)
+      end
+    end
+
+    test "dumps equivalent hex values identically regardless of case" do
+      for format <- [:hex, :hex32] do
+        params = Once.init(ex_format: format, db_format: format)
+        lowercase = Once.to_format!(<<42::42, 0::22>>, format)
+        uppercase = String.upcase(lowercase)
+        assert uppercase != lowercase
+        assert {:ok, stored} = Once.dump(lowercase, nil, params)
+        assert {:ok, ^stored} = Once.dump(uppercase, nil, params)
+      end
+    end
+
     test "accepts and decodes url64-encoded when ex_format != int" do
       ambiguous = "12345678901"
       assert {:ok, raw} = Once.load(ambiguous, nil, %{@base_opts | ex_format: :raw, mask: false})
