@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 - Document that non-canonical string IDs (uppercase `:hex`/`:hex32`, non-zero trailing bits in `:url64`/`:hex32`) are accepted and passed through unchanged, and how that affects `Once.Query`, ordering, lookups and uniqueness.
 - Document how to protect against non-canonical string IDs: use different Elixir and database formats, canonicalize external input by converting through `:raw`, and check for uppercase rows.
 - Add opt-in option `normalize: true` to re-encode `:url64`, `:hex` and `:hex32` values to their canonical spelling (lowercase hex, zeroed trailing bits) on cast, load and dump. Only enable it if your existing data is already canonical.
+- Add `Once.Canonicalize`, migration helpers that rewrite stored `:hex`, `:hex32` and `:url64` IDs to their canonical spelling on PostgreSQL and MySQL. Listing the primary keys is enough: foreign keys that reference them (and persisted prefixes) are detected and changed along with them. `ecto_sql` is now an optional dependency, needed only to use `Once.Canonicalize.up/2`.
+- Add `Once.Canonicalize.check/3` to check whether stored IDs need canonicalization without rewriting them.
 
 ## [2.1.0]
 
