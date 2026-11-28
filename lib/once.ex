@@ -205,6 +205,20 @@ defmodule Once do
 
   Using integers or `:raw` as `:db_format` avoids all of these. Canonicalizing existing data is a breaking change, so Once does not do it for you.
 
+  #### Protecting your data
+
+  - **Use different formats for Elixir and the database**, for example `ex_format: :url64` with `db_format: :hex`. Every value then passes through its raw bytes on the way to the database, so only the canonical spelling is stored and queried.
+  - **Canonicalize external input** when `:ex_format` equals a string `:db_format`. `to_format/3` only validates a value that is already in the target format and doesn't change its spelling, so convert through `:raw` instead:
+
+        iex> "ABCDEF0123456789" |> Once.to_format!(:raw) |> Once.to_format!(:hex)
+        "abcdef0123456789"
+        iex> "0000000000001" |> Once.to_format!(:raw) |> Once.to_format!(:hex32)
+        "0000000000000"
+
+    Do this before the value reaches `Ecto.Changeset.cast/4`, for example when preprocessing API params.
+  - **Make other writers lowercase** their hex output (MySQL's `HEX()` returns uppercase; use `LOWER(HEX(...))`).
+  - **Check for uppercase rows** before relying on range queries, for example `SELECT count(*) FROM my_table WHERE id <> lower(id)`. On MySQL, compare with a binary collation: `WHERE id <> LOWER(id) COLLATE utf8mb4_bin`.
+
   ## Ecto Schema Integration
 
   The recommended approach is to define a base schema module that centralises your Once configuration. This example uses sortable IDs so their generation time can also be exposed with `Once.CreatedAt`:
