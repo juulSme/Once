@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Document the requirement to use one NoNoncense instance and nonce type for unique IDs.
 - Fix loading binary database formats when the Elixir format is an integer.
 - Reject stored IDs that do not decode to eight bytes in `Once.CreatedAt`.
+- Document that non-canonical string IDs (uppercase `:hex`/`:hex32`, non-zero trailing bits in `:url64`/`:hex32`) are accepted and passed through unchanged, and how that affects `Once.Query`, ordering, lookups and uniqueness.
 
 ## [2.1.0]
 
