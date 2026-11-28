@@ -291,17 +291,14 @@ defmodule Once do
   def load(value, _, %{persist_prefix: true}) when not is_binary(value), do: :error
 
   def load(value, _, params = %{prefix: prefix, ex_format: ex_fmt}) do
-    to_strip = Prefix.if_persistent(prefix, params)
+    persisted_prefix = Prefix.if_persistent(prefix, params)
+    parse_num_str? = params.persist_prefix and params.db_format in @int_formats
 
-    map_prefixed value, to_strip, prefix do
-      parse_num? = params.persist_prefix and params.db_format in @int_formats
-
-      with {:ok, input} <- Parse.maybe_parse_num_str(stripped, parse_num?) do
-        if params.mask do
-          Mask.to_masked_format(input, params.no_noncense, ex_fmt, false)
-        else
-          convert(input, ex_fmt, false)
-        end
+    map_prefixed value, persisted_prefix, prefix do
+      if params.mask do
+        Mask.to_masked_format(stripped, params.no_noncense, ex_fmt, parse_num_str?)
+      else
+        convert(stripped, ex_fmt, parse_num_str?)
       end
     end
   end
@@ -310,22 +307,22 @@ defmodule Once do
   def dump(nil, _, _), do: {:ok, nil}
 
   def dump(value, _, params = %{prefix: prefix, ex_format: ex_fmt, db_format: db_fmt}) do
-    to_put = Prefix.if_persistent(prefix, params)
+    persisted_prefix = Prefix.if_persistent(prefix, params)
+    parse_num_str? = ex_fmt in @int_formats
 
-    map_prefixed value, prefix, to_put do
+    map_prefixed value, prefix, persisted_prefix do
       if params.mask do
-        Mask.to_unmasked_format(stripped, params.no_noncense, db_fmt, ex_fmt in @int_formats)
+        Mask.to_unmasked_format(stripped, params.no_noncense, db_fmt, parse_num_str?)
       else
-        convert(stripped, db_fmt, ex_fmt in @int_formats)
+        convert(stripped, db_fmt, parse_num_str?)
       end
       |> pad_persisted_integer(params.persist_prefix, db_fmt)
     end
   end
 
   defp pad_persisted_integer(conversion_result, persist_prefix?, db_format)
-  defp pad_persisted_integer(conversion_result, false, _), do: conversion_result
 
-  defp pad_persisted_integer({:ok, value}, _, db_format) when db_format in @int_formats do
+  defp pad_persisted_integer({:ok, value}, true, db_format) when db_format in @int_formats do
     {:ok, Pad.zero_lpad_int(value, 20)}
   end
 
