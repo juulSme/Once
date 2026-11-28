@@ -5,11 +5,11 @@ defmodule Once do
   The examples represent the same underlying value.
 
   - `:url64` a url64-encoded string of 11 characters, for example `"zAjhfZyAAAE"`
-  - `:hex` a hex-encoded string of 16 characters, for example `"cc08e17d9c800001"`
+  - `:hex` a lowercase hex-encoded string of 16 characters, for example `"cc08e17d9c800001"`
   - `:raw` a binary of 8 bytes, for example `<<204, 8, 225, 125, 156, 128, 0, 1>>`
   - `:signed` a signed 64-bits integer between `-(2^63)` and `2^63-1`, for example `-3744495160545771519`
   - `:unsigned` an unsigned 64-bits integer between `0` and `2^64-1`, for example `14702248913163780097`
-  - `:hex32` an extended-hex string of 13 characters, for example `"pg4e2vcsg0002"`
+  - `:hex32` a lowercase extended-hex string of 13 characters, for example `"pg4e2vcsg0002"`
   """
   @options_docs """
   - `:no_noncense` name of the NoNoncense instance used to generate new IDs (default `Once`)
@@ -19,7 +19,6 @@ defmodule Once do
   - `:mask` use encrypted IDs in Elixir; encrypt on load, decrypt on dump (default `false`)
   - `:prefix` a string prefix to prepend to IDs, for example `"usr_"` or `"prod_"` (default `nil`)
   - `:persist_prefix` whether to store the prefix in the database (default `false`)
-  - `:normalize` re-encode `:url64`, `:hex` and `:hex32` values to their canonical spelling on cast, load and dump, even if they are already in the target format. Read [the caveats](`m:Once#module-non-canonical-string-ids`) before enabling (default `false`)
   """
 
   @moduledoc """
@@ -154,13 +153,13 @@ defmodule Once do
   >
   > Similarly, `to_format/3` only parses numeric strings as integers with option `parse_int: true`.
 
-  That's because we can't disambiguate some binaries that are valid hex, hex32, url64 and raw binaries and also valid numeric strings. An example is `"12345678901"`:
+  That's because we can't disambiguate some binaries that are valid hex, hex32, url64 and raw binaries and also valid numeric strings. An example is `"12345678900"`:
 
       # interpret as numeric string, format as signed int
-      iex> {:ok, 12345678901}          = Once.to_format("12345678901", :signed, parse_int: true)
+      iex> {:ok, 12345678900}          = Once.to_format("12345678900", :signed, parse_int: true)
 
       # interpret as url64-encoded binary, format as signed int
-      iex> {:ok, -2923406909136636083} = Once.to_format("12345678901", :signed)
+      iex> {:ok, -2923406909136636083} = Once.to_format("12345678900", :signed)
 
   The `:ex_format` setting and `:parse_int` option resolve this ambiguity, at the cost of some flexibility.
 
@@ -188,43 +187,8 @@ defmodule Once do
 
   #### Sorting in your database / `ORDER BY id` queries
 
-  - **PostgreSQL**: Only supports signed integers. Using `"ORDER BY id"` will work fine until you reach negative numbers (same as `:signed` in Elixir). The easiest way to deal with this is to ignore the problem and assume that a) your app will not reach that age or b) Postgres will support unsigned ints at some point in the next 70 years. Alternatively, use `db_format: :hex` or `:hex32`. These are fixed-length, human-readable formats that sort correctly throughout the range, at the cost of storage space, as long as all stored values are canonical (see [Non-canonical String IDs](#module-non-canonical-string-ids)).
+  - **PostgreSQL**: Only supports signed integers. Using `"ORDER BY id"` will work fine until you reach negative numbers (same as `:signed` in Elixir). The easiest way to deal with this is to ignore the problem and assume that a) your app will not reach that age or b) Postgres will support unsigned ints at some point in the next 70 years. Alternatively, use `db_format: :hex` or `:hex32`. These are fixed-length, human-readable formats that sort correctly throughout the range, at the cost of storage space.
   - **MySQL**: Supports unsigned bigint, so `:unsigned` format works perfectly for sorting.
-
-  ### Non-canonical String IDs
-
-  Once generates lowercase `:hex` and `:hex32` strings with zeroed trailing bits, but it accepts other spellings of the same ID. When the input and target format are the same, such a spelling is passed through unchanged:
-
-  - `:hex` and `:hex32` accept uppercase and mixed case. IDs generated before Once v0.0.8 were uppercase hex.
-  - `:url64` (2 spare bits) and `:hex32` (1 spare bit) accept any value in their unused trailing bits, so `"AAAAAAAAAAA"` and `"AAAAAAAAAAB"` are the same ID.
-
-  Ecto changesets recognise these spellings as equal, but a database compares the stored strings. If a column holds non-canonical values (legacy rows, or rows written by something other than Once), this can cause problems:
-
-  - With `db_format: :hex` or `:hex32` on a bytewise-ordered column, `Once.Query` macros, `ORDER BY` and keyset pagination (`id > ^last`) can return wrong rows. Query boundaries are canonical: uppercase letters sort before lowercase ones, and a hex32 value with a non-zero trailing bit sorts after its canonical spelling.
-  - If `:ex_format` differs from `:db_format` (for example `:url64` in Elixir and `:hex` in the database), dumping always produces the canonical spelling, so lookups and updates by ID (`Repo.get/2`, `Repo.update/2`, `where: id == ^id`) miss non-canonical rows.
-  - The same ID can be stored under several spellings, which unique indexes and foreign keys treat as different values. This needs a string `:db_format` that equals `:ex_format`, combined with unvalidated external input or writers other than Once.
-
-  Using integers or `:raw` as `:db_format` avoids all of these. Canonicalizing existing data is a breaking change, so Once does not do it for you.
-
-  #### Protecting your data
-
-  - **Use different formats for Elixir and the database**, for example `ex_format: :url64` with `db_format: :hex`. Every value then passes through its raw bytes on the way to the database, so only the canonical spelling is stored and queried.
-  - **Set `normalize: true`** to re-encode `:url64`, `:hex` and `:hex32` values to their canonical spelling on `cast/2`, `load/3` and `dump/3`, even when they are already in the target format. This keeps `:ex_format` equal to `:db_format` safe from new non-canonical values. Only enable it if your existing data is already canonical: a non-canonical value would be loaded in canonical form and might no longer be found by dumped lookups. Run the check below first. `to_format/3` is not affected by this option.
-  - **Canonicalize external input** when `:ex_format` equals a string `:db_format` and you don't use `normalize: true`. `to_format/3` only validates a value that is already in the target format and doesn't change its spelling, so convert through `:raw` instead:
-
-        iex> "ABCDEF0123456789" |> Once.to_format!(:raw) |> Once.to_format!(:hex)
-        "abcdef0123456789"
-        iex> "0000000000001" |> Once.to_format!(:raw) |> Once.to_format!(:hex32)
-        "0000000000000"
-
-    Do this before the value reaches `Ecto.Changeset.cast/4`, for example when preprocessing API params.
-  - **Make other writers lowercase** their hex output (MySQL's `HEX()` returns uppercase; use `LOWER(HEX(...))`).
-  - **Check for non-canonical rows** before enabling normalization or relying on range queries. `Once.Canonicalize.check/3` reports whether a migration is needed without changing data:
-
-        Once.Canonicalize.check(MyApp.Repo, [{"users", "id"}], format: :hex32)
-
-    It checks declared foreign keys in the same schema too, and raises on invalid values. Check other ID columns separately. See `Once.Canonicalize.check/3` for prefixes and limitations.
-  - **Canonicalize existing rows** with the migration helpers in `Once.Canonicalize`. They rewrite primary and foreign key columns together, for PostgreSQL and MySQL.
 
   ## Ecto Schema Integration
 
@@ -286,7 +250,6 @@ defmodule Once do
           | {:mask, boolean()}
           | {:prefix, binary() | nil}
           | {:persist_prefix, boolean()}
-          | {:normalize, boolean()}
 
   @default_opts %{
     no_noncense: __MODULE__,
@@ -295,8 +258,7 @@ defmodule Once do
     nonce_type: :counter,
     mask: false,
     prefix: nil,
-    persist_prefix: false,
-    normalize: false
+    persist_prefix: false
   }
 
   #######################
@@ -320,10 +282,8 @@ defmodule Once do
     Once.Query.Boundary.cast(boundary, params)
   end
 
-  def cast(value, params = %{ex_format: ex_format, prefix: prefix}) do
-    map_prefixed value, prefix, prefix do
-      convert(stripped, ex_format, ex_format in @int_formats, params[:normalize])
-    end
+  def cast(value, %{ex_format: ex_format, prefix: prefix}) do
+    do_to_format(value, ex_format, prefix, ex_format in @int_formats)
   end
 
   @impl true
@@ -338,7 +298,7 @@ defmodule Once do
       if params.mask do
         Mask.to_masked_format(stripped, params.no_noncense, ex_fmt, parse_num_str?)
       else
-        convert(stripped, ex_fmt, parse_num_str?, params[:normalize])
+        convert(stripped, ex_fmt, parse_num_str?)
       end
     end
   end
@@ -354,7 +314,7 @@ defmodule Once do
       if params.mask do
         Mask.to_unmasked_format(stripped, params.no_noncense, db_fmt, parse_num_str?)
       else
-        convert(stripped, db_fmt, parse_num_str?, params[:normalize])
+        convert(stripped, db_fmt, parse_num_str?)
       end
       |> pad_persisted_integer(params.persist_prefix, db_fmt)
     end
@@ -503,14 +463,14 @@ defmodule Once do
 
   defp do_to_format(value, format, strip_prefix, put_prefix, parse_int?) do
     map_prefixed value, strip_prefix, put_prefix do
-      convert(stripped, format, parse_int?, false)
+      convert(stripped, format, parse_int?)
     end
   end
 
-  defp convert(value, format, parse_int?, normalize?) do
+  defp convert(value, format, parse_int?) do
     with {:ok, parsed} <- Parse.maybe_parse_num_str(value, parse_int?),
          {:ok, format_in} <- Parse.identify_format(parsed) do
-      Parse.maybe_convert(parsed, format_in, format, normalize?)
+      Parse.maybe_convert(parsed, format_in, format)
     end
   end
 end

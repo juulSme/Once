@@ -147,7 +147,7 @@ defmodule Once.PrefixedUnitTest do
 
   describe "cast/2" do
     test "accepts and decodes url64-encoded when ex_format != int" do
-      ambiguous = "t_12345678901"
+      ambiguous = "t_12345678900"
       assert {:ok, raw} = Once.cast(ambiguous, %{@base_opts | ex_format: :raw})
       # "t_" prefix (<<"t_">>) + 64-bit ID
       assert <<"t_", _::64>> = raw
@@ -161,7 +161,7 @@ defmodule Once.PrefixedUnitTest do
     end
 
     test "accepts and decodes hex32-encoded when ex_format != int" do
-      ambiguous = "t_1234567890123"
+      ambiguous = "t_1234567890124"
       assert {:ok, raw} = Once.cast(ambiguous, %{@base_opts | ex_format: :raw})
       # "t_" prefix + 64-bit ID
       assert <<"t_", _::64>> = raw
@@ -215,7 +215,7 @@ defmodule Once.PrefixedUnitTest do
 
   describe "dump/3" do
     test "accepts and decodes url64-encoded when ex_format != int" do
-      ambiguous = "t_12345678901"
+      ambiguous = "t_12345678900"
 
       assert {:ok, raw} =
                Once.dump(ambiguous, nil, %{@base_opts | ex_format: :hex, db_format: :raw})
@@ -235,7 +235,7 @@ defmodule Once.PrefixedUnitTest do
     end
 
     test "accepts and decodes hex32-encoded when ex_format != int" do
-      ambiguous = "t_1234567890123"
+      ambiguous = "t_1234567890124"
 
       assert {:ok, raw} =
                Once.dump(ambiguous, nil, %{@base_opts | ex_format: :hex32, db_format: :raw})

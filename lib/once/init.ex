@@ -30,10 +30,6 @@ defmodule Once.Init do
       raise ArgumentError, "option :persist_prefix must be a boolean"
     end
 
-    if not is_boolean(opts.normalize) do
-      raise ArgumentError, "option :normalize must be a boolean"
-    end
-
     if opts.mask and opts.nonce_type == :encrypted do
       raise ArgumentError, "there is no point in masking encrypted nonces"
     end
@@ -56,6 +52,10 @@ defmodule Once.Init do
 
     if is_map_key(opts, :get_key) do
       raise ArgumentError, "option :get_key is deprecated"
+    end
+
+    if is_map_key(opts, :normalize) do
+      raise ArgumentError, "option :normalize is deprecated"
     end
 
     opts

@@ -54,7 +54,7 @@ defmodule Once.MaskedUnitTest do
 
   describe "dump/3" do
     test "accepts and decodes url64-encoded when ex_format != int" do
-      ambiguous = "12345678901"
+      ambiguous = "12345678900"
 
       assert {:ok, raw} =
                Once.dump(ambiguous, nil, %{@base_opts | ex_format: :hex, db_format: :raw})
@@ -76,7 +76,7 @@ defmodule Once.MaskedUnitTest do
     end
 
     test "accepts and decodes hex32-encoded when ex_format != int" do
-      ambiguous = "1234567890123"
+      ambiguous = "1234567890124"
 
       assert {:ok, raw} =
                Once.dump(ambiguous, nil, %{@base_opts | ex_format: :hex32, db_format: :raw})
@@ -152,7 +152,7 @@ defmodule Once.MaskedUnitTest do
 
   describe "load/3" do
     test "accepts and decodes url64-encoded when ex_format != int" do
-      ambiguous = "12345678901"
+      ambiguous = "12345678900"
 
       assert {:ok, loaded} =
                Once.load(ambiguous, nil, %{@base_opts | ex_format: :raw, db_format: :url64})
@@ -174,7 +174,7 @@ defmodule Once.MaskedUnitTest do
     end
 
     test "accepts and decodes hex32-encoded when ex_format != int" do
-      ambiguous = "1234567890123"
+      ambiguous = "1234567890124"
 
       assert {:ok, loaded} =
                Once.load(ambiguous, nil, %{@base_opts | ex_format: :raw, db_format: :hex32})

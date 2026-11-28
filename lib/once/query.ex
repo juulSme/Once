@@ -31,9 +31,7 @@ defmodule Once.Query do
   or `Once.CreatedAt` type configured with `nonce_type: :sortable`; masked IDs
   are supported. For `Once.CreatedAt` the field's epoch must match the query
   module's epoch. The database format must be `:signed`, `:unsigned`, `:raw`, `:hex`, or `:hex32`,
-  and text and binary columns must use bytewise ordering. Stored `:hex` and `:hex32`
-  values must be canonical: lowercase, with zeroed trailing bits for `:hex32` (see
-  [Non-canonical String IDs](`m:Once#module-non-canonical-string-ids`)). Signed IDs must remain
+  and text and binary columns must use bytewise ordering. Signed IDs must remain
   in the first half of their timestamp range. All IDs in the field must use the
   configured epoch, which is not inferred or checked against the generator.
 

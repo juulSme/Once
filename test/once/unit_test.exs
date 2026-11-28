@@ -70,15 +70,8 @@ defmodule Once.UnitTest do
                no_noncense: Once,
                mask: false,
                persist_prefix: false,
-               normalize: false,
                prefix: nil
              } == Once.init()
-    end
-
-    test "validates :normalize" do
-      assert_raise ArgumentError, "option :normalize must be a boolean", fn ->
-        Once.init(normalize: "yes")
-      end
     end
 
     test "overrides defaults" do
@@ -123,7 +116,7 @@ defmodule Once.UnitTest do
   describe "equal?/3" do
     test "compares equivalent formats by their underlying value" do
       opts = Once.init(ex_format: :hex)
-      assert Once.equal?("FFFFFFFFFFFFFFFF", "ffffffffffffffff", opts)
+      refute Once.equal?("FFFFFFFFFFFFFFFF", "ffffffffffffffff", opts)
       assert Once.equal?("ffffffffffffffff", "__________8", opts)
       assert Once.equal?(-1, @unsigned_max, opts)
       refute Once.equal?("__________8", "AAAAAAAAAAA", opts)
@@ -205,7 +198,7 @@ defmodule Once.UnitTest do
 
   describe "cast/2" do
     test "accepts and decodes url64-encoded when ex_format != int" do
-      ambiguous = "12345678901"
+      ambiguous = "12345678900"
       assert {:ok, raw} = Once.cast(ambiguous, %{@base_opts | ex_format: :raw})
       assert <<int::64>> = raw
       assert to_string(int) != ambiguous
@@ -219,7 +212,7 @@ defmodule Once.UnitTest do
     end
 
     test "accepts and decodes hex32-encoded when ex_format != int" do
-      ambiguous = "1234567890123"
+      ambiguous = "1234567890124"
       assert {:ok, raw} = Once.cast(ambiguous, %{@base_opts | ex_format: :raw})
       assert <<int::64>> = raw
       assert to_string(int) != ambiguous
@@ -258,56 +251,49 @@ defmodule Once.UnitTest do
     end
   end
 
-  describe "normalize option" do
-    # {format, canonical, non-canonical spelling of the same ID}
-    @spellings [
-      {:hex, "abcdef0123456789", "ABCDEF0123456789"},
-      {:hex, "abcdef0123456789", "AbCdEf0123456789"},
-      {:hex32, "0000000000000", "0000000000001"},
-      {:hex32, "pg4e2vcsg0002", "PG4E2VCSG0002"},
-      {:url64, "AAAAAAAAAAA", "AAAAAAAAAAB"}
+  describe "non-canonical hex, hex32 and url64" do
+    @rejected [
+      {:hex, "ABCDEF0123456789"},
+      {:hex, "AbCdEf0123456789"},
+      {:hex32, "0000000000001"},
+      {:hex32, "PG4E2VCSG0002"},
+      {:url64, "AAAAAAAAAAB"},
+      {:url64, "__________9"}
     ]
 
-    test "passes non-canonical spellings through by default" do
-      for {format, _canonical, other} <- @spellings do
+    test "cast, dump, load and to_format reject uppercase hex and non-zero trailing bits" do
+      for {format, value} <- @rejected do
         params = Once.init(ex_format: format, db_format: format)
-        assert {:ok, ^other} = Once.cast(other, params)
-        assert {:ok, ^other} = Once.dump(other, nil, params)
-        assert {:ok, ^other} = Once.load(other, nil, params)
+        assert :error = Once.cast(value, params)
+        assert :error = Once.dump(value, nil, params)
+        assert :error = Once.load(value, nil, params)
+
+        for to <- [format, :raw, :url64, :unsigned] do
+          assert :error = Once.to_format(value, to)
+        end
       end
     end
 
-    test "canonicalizes on cast, dump and load when enabled" do
-      for {format, canonical, other} <- @spellings do
-        params = Once.init(ex_format: format, db_format: format, normalize: true)
-        assert {:ok, ^canonical} = Once.cast(other, params)
-        assert {:ok, ^canonical} = Once.dump(other, nil, params)
-        assert {:ok, ^canonical} = Once.load(other, nil, params)
-        assert {:ok, ^canonical} = Once.cast(canonical, params)
+    test "canonical values are accepted" do
+      for {format, value} <- [
+            {:hex, "abcdef0123456789"},
+            {:hex32, "pg4e2vcsg0002"},
+            {:url64, "AAAAAAAAAAA"},
+            {:url64, "__________8"}
+          ] do
+        params = Once.init(ex_format: format, db_format: format)
+        assert {:ok, ^value} = Once.cast(value, params)
+        assert {:ok, ^value} = Once.dump(value, nil, params)
+        assert {:ok, ^value} = Once.load(value, nil, params)
       end
     end
 
-    test "keeps prefixes and still rejects invalid values" do
-      params =
-        Once.init(
-          prefix: "t_",
-          persist_prefix: true,
-          ex_format: :hex,
-          db_format: :hex,
-          normalize: true
-        )
+    test "rejects non-canonical values behind a prefix" do
+      params = Once.init(prefix: "t_", persist_prefix: true, ex_format: :hex, db_format: :hex)
 
-      assert {:ok, "t_abcdef0123456789"} = Once.cast("t_ABCDEF0123456789", params)
-      assert {:ok, "t_abcdef0123456789"} = Once.dump("t_ABCDEF0123456789", nil, params)
-      assert :error = Once.cast("ABCDEF0123456789", params)
-      assert :error = Once.cast("t_ABCDEF012345678G", params)
-      assert :error = Once.dump("t_ABCDEF01234567", nil, params)
-    end
-
-    test "does not change conversions between different formats or to_format/3" do
-      params = Once.init(ex_format: :url64, db_format: :hex, normalize: true)
-      assert {:ok, "abcdef0123456789"} = Once.dump("q83vASNFZ4k", nil, params)
-      assert {:ok, "ABCDEF0123456789"} = Once.to_format("ABCDEF0123456789", :hex)
+      assert {:ok, "t_abcdef0123456789"} = Once.cast("t_abcdef0123456789", params)
+      assert :error = Once.cast("t_ABCDEF0123456789", params)
+      assert :error = Once.dump("t_ABCDEF0123456789", nil, params)
     end
   end
 
@@ -341,7 +327,7 @@ defmodule Once.UnitTest do
     end
 
     test "accepts and decodes url64-encoded when ex_format != int" do
-      ambiguous = "12345678901"
+      ambiguous = "12345678900"
       assert {:ok, raw} = Once.load(ambiguous, nil, %{@base_opts | ex_format: :raw, mask: false})
       assert <<int::64>> = raw
       assert to_string(int) != ambiguous
@@ -355,7 +341,7 @@ defmodule Once.UnitTest do
     end
 
     test "accepts and decodes hex32-encoded when ex_format != int" do
-      ambiguous = "1234567890123"
+      ambiguous = "1234567890124"
       assert {:ok, raw} = Once.load(ambiguous, nil, %{@base_opts | ex_format: :raw, mask: false})
       assert <<int::64>> = raw
       assert to_string(int) != ambiguous
@@ -371,7 +357,7 @@ defmodule Once.UnitTest do
 
   describe "dump/3" do
     test "accepts and decodes url64-encoded when ex_format != int" do
-      ambiguous = "12345678901"
+      ambiguous = "12345678900"
 
       assert {:ok, raw} =
                Once.dump(ambiguous, nil, %{@base_opts | ex_format: :hex, db_format: :raw})
@@ -391,7 +377,7 @@ defmodule Once.UnitTest do
     end
 
     test "accepts and decodes hex32-encoded when ex_format != int" do
-      ambiguous = "1234567890123"
+      ambiguous = "1234567890124"
 
       assert {:ok, raw} =
                Once.dump(ambiguous, nil, %{@base_opts | ex_format: :hex32, db_format: :raw})
