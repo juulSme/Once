@@ -8,10 +8,6 @@ Once IDs are based on counter, time-sortable or encrypted nonces. These underlyi
 
 The library has only `Ecto` and its sibling `NoNoncense` as dependencies. NoNoncense generates the actual values and performs incredibly well, hitting rates of tens of millions of nonces per second, and it also helps you to safeguard the uniqueness guarantees.
 
-> #### Read the migration guide {: .warning}
->
-> If you're upgrading from v0.x.x and you use encrypted IDs, please read the [Migration Guide](MIGRATION.md) carefully - there are breaking changes that require attention to preserve uniqueness guarantees.
-
 ## Features
 
 ### ID Generation Types

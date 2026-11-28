@@ -30,10 +30,6 @@ defmodule Once do
 
   The library has only `Ecto` and its sibling `NoNoncense` as dependencies. NoNoncense generates the actual values and performs incredibly well, hitting rates of tens of millions of nonces per second, and it also helps you to safeguard the uniqueness guarantees.
 
-  > #### Read the migration guide {: .warning}
-  >
-  > If you're upgrading from v0.x.x and you use encrypted IDs, please read the [Migration Guide](MIGRATION.md) carefully - there are breaking changes that require attention to preserve uniqueness guarantees.
-
   ## Quick Start
 
   To get going, you need to set up a `NoNoncense` instance to generate the base unique values. Follow [its documentation](https://hexdocs.pm/no_noncense) to do so. `Once` expects an instance with its own module name by default:
