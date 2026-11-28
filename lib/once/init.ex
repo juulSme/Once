@@ -30,6 +30,10 @@ defmodule Once.Init do
       raise ArgumentError, "option :persist_prefix must be a boolean"
     end
 
+    if not is_boolean(opts.normalize) do
+      raise ArgumentError, "option :normalize must be a boolean"
+    end
+
     if opts.mask and opts.nonce_type == :encrypted do
       raise ArgumentError, "there is no point in masking encrypted nonces"
     end

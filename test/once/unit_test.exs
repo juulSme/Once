@@ -70,8 +70,15 @@ defmodule Once.UnitTest do
                no_noncense: Once,
                mask: false,
                persist_prefix: false,
+               normalize: false,
                prefix: nil
              } == Once.init()
+    end
+
+    test "validates :normalize" do
+      assert_raise ArgumentError, "option :normalize must be a boolean", fn ->
+        Once.init(normalize: "yes")
+      end
     end
 
     test "overrides defaults" do
@@ -248,6 +255,59 @@ defmodule Once.UnitTest do
     test "rejects floats" do
       assert :error == Once.cast("1.2", %{@base_opts | ex_format: :unsigned})
       assert :error == Once.cast("1.0", %{@base_opts | ex_format: :unsigned})
+    end
+  end
+
+  describe "normalize option" do
+    # {format, canonical, non-canonical spelling of the same ID}
+    @spellings [
+      {:hex, "abcdef0123456789", "ABCDEF0123456789"},
+      {:hex, "abcdef0123456789", "AbCdEf0123456789"},
+      {:hex32, "0000000000000", "0000000000001"},
+      {:hex32, "pg4e2vcsg0002", "PG4E2VCSG0002"},
+      {:url64, "AAAAAAAAAAA", "AAAAAAAAAAB"}
+    ]
+
+    test "passes non-canonical spellings through by default" do
+      for {format, _canonical, other} <- @spellings do
+        params = Once.init(ex_format: format, db_format: format)
+        assert {:ok, ^other} = Once.cast(other, params)
+        assert {:ok, ^other} = Once.dump(other, nil, params)
+        assert {:ok, ^other} = Once.load(other, nil, params)
+      end
+    end
+
+    test "canonicalizes on cast, dump and load when enabled" do
+      for {format, canonical, other} <- @spellings do
+        params = Once.init(ex_format: format, db_format: format, normalize: true)
+        assert {:ok, ^canonical} = Once.cast(other, params)
+        assert {:ok, ^canonical} = Once.dump(other, nil, params)
+        assert {:ok, ^canonical} = Once.load(other, nil, params)
+        assert {:ok, ^canonical} = Once.cast(canonical, params)
+      end
+    end
+
+    test "keeps prefixes and still rejects invalid values" do
+      params =
+        Once.init(
+          prefix: "t_",
+          persist_prefix: true,
+          ex_format: :hex,
+          db_format: :hex,
+          normalize: true
+        )
+
+      assert {:ok, "t_abcdef0123456789"} = Once.cast("t_ABCDEF0123456789", params)
+      assert {:ok, "t_abcdef0123456789"} = Once.dump("t_ABCDEF0123456789", nil, params)
+      assert :error = Once.cast("ABCDEF0123456789", params)
+      assert :error = Once.cast("t_ABCDEF012345678G", params)
+      assert :error = Once.dump("t_ABCDEF01234567", nil, params)
+    end
+
+    test "does not change conversions between different formats or to_format/3" do
+      params = Once.init(ex_format: :url64, db_format: :hex, normalize: true)
+      assert {:ok, "abcdef0123456789"} = Once.dump("q83vASNFZ4k", nil, params)
+      assert {:ok, "ABCDEF0123456789"} = Once.to_format("ABCDEF0123456789", :hex)
     end
   end
 

@@ -19,6 +19,7 @@ defmodule Once do
   - `:mask` use encrypted IDs in Elixir; encrypt on load, decrypt on dump (default `false`)
   - `:prefix` a string prefix to prepend to IDs, for example `"usr_"` or `"prod_"` (default `nil`)
   - `:persist_prefix` whether to store the prefix in the database (default `false`)
+  - `:normalize` re-encode `:url64`, `:hex` and `:hex32` values to their canonical spelling on cast, load and dump, even if they are already in the target format. Read [the caveats](`m:Once#module-non-canonical-string-ids`) before enabling (default `false`)
   """
 
   @moduledoc """
@@ -208,7 +209,8 @@ defmodule Once do
   #### Protecting your data
 
   - **Use different formats for Elixir and the database**, for example `ex_format: :url64` with `db_format: :hex`. Every value then passes through its raw bytes on the way to the database, so only the canonical spelling is stored and queried.
-  - **Canonicalize external input** when `:ex_format` equals a string `:db_format`. `to_format/3` only validates a value that is already in the target format and doesn't change its spelling, so convert through `:raw` instead:
+  - **Set `normalize: true`** to re-encode `:url64`, `:hex` and `:hex32` values to their canonical spelling on `cast/2`, `load/3` and `dump/3`, even when they are already in the target format. This keeps `:ex_format` equal to `:db_format` safe from new non-canonical values. Only enable it if your existing data is already canonical: a stored uppercase value would be loaded in lowercase and then no longer be found by dumped lookups. Run the check below first. `to_format/3` is not affected by this option.
+  - **Canonicalize external input** when `:ex_format` equals a string `:db_format` and you don't use `normalize: true`. `to_format/3` only validates a value that is already in the target format and doesn't change its spelling, so convert through `:raw` instead:
 
         iex> "ABCDEF0123456789" |> Once.to_format!(:raw) |> Once.to_format!(:hex)
         "abcdef0123456789"
@@ -279,6 +281,7 @@ defmodule Once do
           | {:mask, boolean()}
           | {:prefix, binary() | nil}
           | {:persist_prefix, boolean()}
+          | {:normalize, boolean()}
 
   @default_opts %{
     no_noncense: __MODULE__,
@@ -287,7 +290,8 @@ defmodule Once do
     nonce_type: :counter,
     mask: false,
     prefix: nil,
-    persist_prefix: false
+    persist_prefix: false,
+    normalize: false
   }
 
   #######################
@@ -311,8 +315,10 @@ defmodule Once do
     Once.Query.Boundary.cast(boundary, params)
   end
 
-  def cast(value, %{ex_format: ex_format, prefix: prefix}) do
-    do_to_format(value, ex_format, prefix, ex_format in @int_formats)
+  def cast(value, params = %{ex_format: ex_format, prefix: prefix}) do
+    map_prefixed value, prefix, prefix do
+      convert(stripped, ex_format, ex_format in @int_formats, params[:normalize])
+    end
   end
 
   @impl true
@@ -327,7 +333,7 @@ defmodule Once do
       if params.mask do
         Mask.to_masked_format(stripped, params.no_noncense, ex_fmt, parse_num_str?)
       else
-        convert(stripped, ex_fmt, parse_num_str?)
+        convert(stripped, ex_fmt, parse_num_str?, params[:normalize])
       end
     end
   end
@@ -343,7 +349,7 @@ defmodule Once do
       if params.mask do
         Mask.to_unmasked_format(stripped, params.no_noncense, db_fmt, parse_num_str?)
       else
-        convert(stripped, db_fmt, parse_num_str?)
+        convert(stripped, db_fmt, parse_num_str?, params[:normalize])
       end
       |> pad_persisted_integer(params.persist_prefix, db_fmt)
     end
@@ -492,14 +498,14 @@ defmodule Once do
 
   defp do_to_format(value, format, strip_prefix, put_prefix, parse_int?) do
     map_prefixed value, strip_prefix, put_prefix do
-      convert(stripped, format, parse_int?)
+      convert(stripped, format, parse_int?, false)
     end
   end
 
-  defp convert(value, format, parse_int?) do
+  defp convert(value, format, parse_int?, normalize?) do
     with {:ok, parsed} <- Parse.maybe_parse_num_str(value, parse_int?),
          {:ok, format_in} <- Parse.identify_format(parsed) do
-      Parse.maybe_convert(parsed, format_in, format)
+      Parse.maybe_convert(parsed, format_in, format, normalize?)
     end
   end
 end

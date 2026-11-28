@@ -39,6 +39,21 @@ defmodule Once.Parse do
   end
 
   @doc """
+  Like `maybe_convert/3`, but if `normalize?` is true, string values that are already in the
+  target format are re-encoded to their canonical spelling (lowercase hex, zeroed trailing bits).
+  """
+  @spec maybe_convert(Type.id(), Once.format(), Once.format(), boolean() | nil) ::
+          :error | {:ok, Type.id()}
+  def maybe_convert(value, format_in, format_out, normalize?)
+
+  def maybe_convert(value, format, format, true) when format in @encoded_formats do
+    with {:ok, raw} <- to_raw(value, format), do: {:ok, from_raw(raw, format)}
+  end
+
+  def maybe_convert(value, format_in, format_out, _),
+    do: maybe_convert(value, format_in, format_out)
+
+  @doc """
   Identify the value's format. All ints are grouped together for convert_int/2 to deal with.
   """
   @spec identify_format(Type.id()) :: {:ok, Once.format()} | :error

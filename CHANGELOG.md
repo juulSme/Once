@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Reject stored IDs that do not decode to eight bytes in `Once.CreatedAt`.
 - Document that non-canonical string IDs (uppercase `:hex`/`:hex32`, non-zero trailing bits in `:url64`/`:hex32`) are accepted and passed through unchanged, and how that affects `Once.Query`, ordering, lookups and uniqueness.
 - Document how to protect against non-canonical string IDs: use different Elixir and database formats, canonicalize external input by converting through `:raw`, and check for uppercase rows.
+- Add opt-in option `normalize: true` to re-encode `:url64`, `:hex` and `:hex32` values to their canonical spelling (lowercase hex, zeroed trailing bits) on cast, load and dump. Only enable it if your existing data is already canonical.
 
 ## [2.1.0]
 
