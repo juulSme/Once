@@ -320,9 +320,8 @@ defmodule Once do
     end
   end
 
-  defp pad_persisted_integer(conversion_result, persist_prefix?, db_format)
-
-  defp pad_persisted_integer({:ok, value}, true, db_format) when db_format in @int_formats do
+  defp pad_persisted_integer(_conversion_res = {:ok, value}, _persist_prefix = true, db_format)
+       when db_format in @int_formats do
     {:ok, Pad.zero_lpad_int(value, 20)}
   end
 
@@ -350,8 +349,7 @@ defmodule Once do
   @impl true
   def equal?(left, right, params)
   def equal?(same, same, _), do: true
-  def equal?(nil, _, _), do: false
-  def equal?(_, nil, _), do: false
+  def equal?(left, right, _) when is_nil(left) or is_nil(right), do: false
 
   def equal?(left, right, %{ex_format: ex_format, prefix: prefix}) do
     with {:ok, left} <- do_to_format(left, :raw, prefix, ex_format in @int_formats),
