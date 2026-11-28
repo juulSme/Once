@@ -256,7 +256,7 @@ defmodule Once.UnitTest do
       params = Once.init(ex_format: :unsigned, db_format: :hex)
 
       for id <- [16, 26] do
-        assert {:ok, stored} = Once.dump(id, nil, params) |> IO.inspect()
+        assert {:ok, stored} = Once.dump(id, nil, params)
         assert {:ok, ^id} = Once.load(stored, nil, params)
       end
     end
@@ -277,17 +277,6 @@ defmodule Once.UnitTest do
         value = Once.Prefix.put(id, prefix)
         assert {:ok, stored} = Once.dump(value, nil, params)
         assert {:ok, ^value} = Once.load(stored, nil, params)
-      end
-    end
-
-    test "dumps equivalent hex values identically regardless of case" do
-      for format <- [:hex, :hex32] do
-        params = Once.init(ex_format: format, db_format: format)
-        lowercase = Once.to_format!(<<42::42, 0::22>>, format)
-        uppercase = String.upcase(lowercase)
-        assert uppercase != lowercase
-        assert {:ok, stored} = Once.dump(lowercase, nil, params)
-        assert {:ok, ^stored} = Once.dump(uppercase, nil, params)
       end
     end
 

@@ -197,6 +197,40 @@ defmodule Once.MaskedUnitTest do
   end
 
   describe "round-trip" do
+    test "preserves plaintext across formats and prefix configurations" do
+      formats = [:url64, :hex, :hex32, :raw, :signed, :unsigned]
+      prefix_options = [{nil, false}, {"t_", false}, {"t_", true}]
+
+      for ex_format <- formats,
+          db_format <- formats,
+          {prefix, persist_prefix} <- prefix_options,
+          plaintext <- [0, @signed_max, @signed_max + 1, @unsigned_max, 0x3132333435363738] do
+        params =
+          Once.init(
+            mask: true,
+            ex_format: ex_format,
+            db_format: db_format,
+            prefix: prefix,
+            persist_prefix: persist_prefix
+          )
+
+        raw = <<plaintext::64>>
+        id = raw |> encrypt() |> Once.to_format!(ex_format) |> Once.Prefix.put(prefix)
+        db_value = Once.to_format!(raw, db_format)
+
+        expected =
+          if persist_prefix and db_format in @int_formats do
+            digits = db_value |> abs() |> Integer.to_string() |> String.pad_leading(20, "0")
+            prefix <> if(db_value < 0, do: "-" <> digits, else: digits)
+          else
+            Once.Prefix.put(db_value, if(persist_prefix, do: prefix))
+          end
+
+        assert {:ok, ^expected} = Once.dump(id, nil, params)
+        assert {:ok, ^id} = Once.load(expected, nil, params)
+      end
+    end
+
     test "autogenerate → dump → load maintains plaintext value" do
       params = Once.init(%{@base_opts | ex_format: :url64, db_format: :signed})
 
