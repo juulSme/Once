@@ -25,6 +25,12 @@ jobs:
           MYSQL_ROOT_PASSWORD: supersecret
         ports:
           - 3306:3306
+      mariadb:
+        image: mariadb:latest
+        env:
+          MYSQL_ROOT_PASSWORD: supersecret
+        ports:
+          - 3307:3306
 
     strategy:
       # https://hexdocs.pm/elixir/1.18/compatibility-and-deprecations.html#compatibility-between-elixir-and-erlang-otp
@@ -71,6 +77,8 @@ jobs:
         run: mix compile --warnings-as-errors
       - name: Run tests
         run: mix test
+      - name: Run mariadb tests
+        run: MYSQL_PORT=3307 mix test
       - name: Create docs
         if: matrix.elixir == '1.20.x'
         run: mix docs
