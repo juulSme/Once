@@ -6,9 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Breaking
 
-- Reject non-canonical `:hex`, `:hex32` and `:url64` values everywhere (`cast`, `dump`, `load` and `to_format/3`): uppercase and mixed-case hex and hex32, and hex32 and url64 values whose unused trailing bits are set. Only the spelling that Once generates is accepted, so each ID has exactly one string representation. Rows that still hold uppercase hex (Once v0.0.8 and earlier generated uppercase) can no longer be loaded: lowercase them, including foreign key columns, before upgrading.
-- Remove `Once.Canonicalize` migration helper
-- Remove `Once.Prefixed` which was soft-deprecated.
+- Reject non-canonical `:hex`, `:hex32` and `:url64` values everywhere (`cast`, `dump`, `load` and `to_format/3`): uppercase and mixed-case hex and hex32, and hex32 and url64 values whose unused trailing bits are set. Only the spelling that Once generates is accepted, so each ID has exactly one string representation. See the [migration guide](./MIGRATION.md).
+- Remove `Once.Canonicalize` migration helper and all documentation related to non-canonical strings.
+- Remove `Once.Prefixed` which was soft-deprecated in 1.1.0.
 
 ## [2.2.0]
 
