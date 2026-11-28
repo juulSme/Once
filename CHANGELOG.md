@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 - Allow `persist_prefix: true` with integer `:db_format`s (`:signed`, `:unsigned`). The value is stored as a zero-padded decimal string (20 digits, plus a minus sign for negative values, for example `"usr_00000000000000000123"`), so the database column must be a string type. This combination previously raised an `ArgumentError`. Zero-padding keeps unsigned values sortable as strings; negative signed values do not sort numerically.
 - Implement `Once.equal?/3` to compare IDs by their underlying value across accepted formats in Ecto changesets, respecting configured prefixes and integer parsing rules.
+- Document the requirement to use one NoNoncense instance and nonce type for unique IDs.
 
 ## [2.1.0]
 

@@ -55,6 +55,10 @@ defmodule Once do
 
   And that's it!
 
+  > #### Use one instance and nonce type {: .warning}
+  >
+  > To preserve uniqueness, use a single NoNoncense instance and nonce type to generate all your IDs.
+
   ## Core Concepts
 
   ### ID Generation Types
@@ -64,6 +68,8 @@ defmodule Once do
   - **Counter** (default): Really fast to generate, predictable, works well with b-tree indexes. IDs are generated using a machine init timestamp, machine ID and counter.
   - **Sortable**: Time-sortable like a [Snowflake ID](https://en.wikipedia.org/wiki/Snowflake_ID). Use this when chronological ordering is important.
   - **Encrypted**: Unique and unpredictable, like a UUIDv4 but shorter. Use when you need unpredictable IDs. Note that encrypted IDs cost you data locality, decrease index performance and are slightly slower to generate. Alternatively, use [masked](#module-masked-ids) counter/sortable IDs.
+
+
 
   ### Data Formats
 

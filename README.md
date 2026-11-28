@@ -81,6 +81,10 @@ end
 
 And that's it! Be sure to look at [hexdocs.pm](https://hexdocs.pm/once/) for options and additional info.
 
+> #### Use one instance and nonce type {: .warning}
+>
+> To preserve uniqueness, use a single NoNoncense instance and nonce type to generate all your IDs.
+
 ### Querying sortable IDs
 
 For fields configured with `nonce_type: :sortable`, import `Once.Query` to filter
