@@ -49,7 +49,7 @@ defmodule Once.MixProject do
       {:no_noncense, "~> 2.3"},
       {:ecto, "~> 3.0"},
       {:mix_test_watch, "~> 1.2", only: [:dev], runtime: false},
-      {:ecto_sql, "~> 3.4", optional: true},
+      {:ecto_sql, "~> 3.4", only: [:dev, :test]},
       {:postgrex, "~> 0.1", only: [:dev, :test]},
       {:myxql, "~> 0.1", only: [:dev, :test]},
       {:tidewave, "~> 0.5", only: [:dev]},

@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Breaking
 
+- Remove `Once.Canonicalize` migration helper
 - Remove `Once.Prefixed` which was soft-deprecated.
 
 ## [2.2.0]
