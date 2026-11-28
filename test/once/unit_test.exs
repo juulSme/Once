@@ -113,6 +113,41 @@ defmodule Once.UnitTest do
     assert {:ok, nil} = Once.load(nil, %{}, opts)
   end
 
+  describe "equal?/3" do
+    test "compares equivalent formats by their underlying value" do
+      opts = Once.init(ex_format: :hex)
+      assert Once.equal?("FFFFFFFFFFFFFFFF", "ffffffffffffffff", opts)
+      assert Once.equal?("ffffffffffffffff", "__________8", opts)
+      assert Once.equal?(-1, @unsigned_max, opts)
+      refute Once.equal?("__________8", "AAAAAAAAAAA", opts)
+    end
+
+    test "uses the configured prefix and numeric string parsing rules" do
+      opts = Once.init(prefix: "t_", ex_format: :signed, mask: true)
+      assert Once.equal?("t_-1", "t_18446744073709551615", opts)
+      refute Once.equal?("other_-1", "t_-1", opts)
+      refute Once.equal?("t_12345678901", "t_12345678902", opts)
+
+      assert Once.equal?("12345678901", 12_345_678_901, Once.init(ex_format: :unsigned))
+      refute Once.equal?("12345678901", 12_345_678_901, Once.init(ex_format: :url64))
+    end
+
+    test "handles nil and invalid values without treating failed conversions as equal" do
+      assert Once.equal?(nil, nil, @base_opts)
+      assert Once.equal?("invalid", "invalid", @base_opts)
+      refute Once.equal?(nil, "invalid", @base_opts)
+      refute Once.equal?("invalid", "also invalid", @base_opts)
+    end
+
+    test "Ecto changesets ignore equivalent IDs but retain different IDs" do
+      type = Ecto.ParameterizedType.init(Once, [])
+      changeset = Ecto.Changeset.change({%{id: "__________8"}, %{id: type}})
+
+      assert Ecto.Changeset.put_change(changeset, :id, -1).changes == %{}
+      assert %{id: 0} = Ecto.Changeset.put_change(changeset, :id, 0).changes
+    end
+  end
+
   describe "autogenerate/1" do
     test "generates counter nonces in configured format" do
       params = Once.init()

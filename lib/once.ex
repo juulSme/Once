@@ -77,6 +77,8 @@ defmodule Once do
 
   With the default formats, you might see `"AAAAAACYloA"` in Elixir and `10_000_000` in your database. The reasoning behind these defaults is that the encoded format is readable, short, and JSON-safe by default, while the signed format means you can use a standard bigint column type (resulting in a small, fast index).
 
+  Ecto compares IDs by their underlying value, even when they use different accepted formats. The configured prefix and integer-format parsing rules still apply.
+
   The negative integers will not cause problems with Postgres and MySQL - they both happily accept them. Negative integers will only start to appear after ~70 years of usage. However, be careful if you wish to sort by ID (see [Sorting Considerations](#module-sorting-considerations)).
 
   ### Prefixed IDs
@@ -344,6 +346,21 @@ defmodule Once do
     end
     |> Parse.from_raw(params.ex_format)
     |> Prefix.put(params.prefix)
+  end
+
+  @impl true
+  def equal?(left, right, params)
+  def equal?(same, same, _), do: true
+  def equal?(nil, _, _), do: false
+  def equal?(_, nil, _), do: false
+
+  def equal?(left, right, %{ex_format: ex_format, prefix: prefix}) do
+    with {:ok, left} <- do_to_format(left, :raw, prefix, ex_format in @int_formats),
+         {:ok, right} <- do_to_format(right, :raw, prefix, ex_format in @int_formats) do
+      left == right
+    else
+      _ -> false
+    end
   end
 
   #####################
