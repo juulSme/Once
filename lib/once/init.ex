@@ -38,11 +38,6 @@ defmodule Once.Init do
       raise ArgumentError, "option :prefix must be a binary"
     end
 
-    if opts.persist_prefix and opts.db_format not in @binary_formats do
-      raise ArgumentError,
-            "option :persist_prefix requires db_format :raw, :hex, :hex32 or :url64"
-    end
-
     if opts.prefix == "" do
       raise ArgumentError, "option :prefix can't be an empty string"
     end

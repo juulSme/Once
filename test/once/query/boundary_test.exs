@@ -89,4 +89,35 @@ defmodule Once.Query.BoundaryTest do
       end
     end
   end
+
+  test "preserves integer timestamp limits with persisted prefixes" do
+    epoch = 1_577_836_800_000
+
+    for {format, bits} <- [{:signed, 41}, {:unsigned, 42}] do
+      params =
+        Once.init(nonce_type: :sortable, db_format: format, prefix: "id_", persist_prefix: true)
+
+      last_timestamp = 2 ** bits - 1
+      last_boundary = Boundary.new(epoch + last_timestamp, epoch, :upper)
+      assert {:ok, id} = Boundary.cast(last_boundary, params)
+      assert {:ok, "id_" <> stored} = Once.dump(id, nil, params)
+      assert byte_size(stored) == 20
+      assert {:ok, first_id} = Boundary.cast(Boundary.new(epoch, epoch, :lower), params)
+      assert {:ok, first_stored} = Once.dump(first_id, nil, params)
+      assert first_stored < "id_" <> stored
+
+      values =
+        for timestamp <- [0, 1, 10, 100, last_timestamp] do
+          {:ok, id} = Boundary.cast(Boundary.new(epoch + timestamp, epoch, :lower), params)
+          {:ok, stored} = Once.dump(id, nil, params)
+          stored
+        end
+
+      assert values == Enum.sort(values)
+
+      assert_raise ArgumentError, ~r/outside the sortable range/, fn ->
+        Boundary.cast(Boundary.new(epoch + last_timestamp + 1, epoch, :lower), params)
+      end
+    end
+  end
 end

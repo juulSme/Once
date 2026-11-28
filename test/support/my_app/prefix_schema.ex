@@ -10,11 +10,30 @@ defmodule MyApp.PrefixSchema do
     field :bin_id, Once, prefix: "t_", db_format: :raw
     field :string_id, Once, prefix: "t_", persist_prefix: true, db_format: :url64
 
+    field :prefixed_unsigned_id, Once,
+      prefix: "t_",
+      persist_prefix: true,
+      db_format: :unsigned,
+      ex_format: :unsigned
+
+    field :prefixed_signed_id, Once,
+      prefix: "t_",
+      persist_prefix: true,
+      ex_format: :signed
+
     # mysql-only
     field :unsigned_id, Once, prefix: "t_", db_format: :unsigned, load_in_query: false
   end
 
   def changeset(struct_or_cs \\ %__MODULE__{}, params) do
-    struct_or_cs |> cast(params, [:bin_id, :bigint_id, :string_id, :unsigned_id])
+    struct_or_cs
+    |> cast(params, [
+      :bin_id,
+      :bigint_id,
+      :string_id,
+      :unsigned_id,
+      :prefixed_unsigned_id,
+      :prefixed_signed_id
+    ])
   end
 end

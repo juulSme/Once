@@ -29,6 +29,7 @@ IDs can be represented in multiple formats, both in your Elixir application (`:e
 ### Prefixed IDs
 
 Add Stripe-style prefixes to IDs (e.g., `"usr_AV7m9gAAAAU"`) for better debugging, API clarity and type safety. Prefixes can exist only in Elixir or be persisted to the database.
+Persisted integer IDs use string columns and zero-padded decimal values such as `"usr_00000000000000000123"`.
 
 ### Masked IDs
 

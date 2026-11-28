@@ -83,20 +83,12 @@ defmodule Once.PrefixedUnitTest do
       end
     end
 
-    test "validates db_format compatibility when persist_prefix is true" do
-      for fmt <- @int_formats do
-        assert_raise ArgumentError,
-                     "option :persist_prefix requires db_format :raw, :hex, :hex32 or :url64",
-                     fn ->
-                       Once.init(prefix: "t_", persist_prefix: true, db_format: fmt)
-                     end
-      end
-    end
-
     test "allows compatible db_formats when persist_prefix is true" do
-      for fmt <- @binary_formats do
+      for fmt <- @formats do
         Once.init(prefix: "t_", persist_prefix: true, db_format: fmt)
       end
+
+      assert %{db_format: :signed} = Once.init(prefix: "t_", persist_prefix: true)
     end
 
     test "reject :persist_prefix without :prefix" do
@@ -341,6 +333,107 @@ defmodule Once.PrefixedUnitTest do
   end
 
   describe "persist_prefix option" do
+    test "stores signed integers as prefixed decimal strings" do
+      for ex_format <- [:url64, :hex, :signed, :unsigned],
+          {raw, signed} <- [
+            {<<0::64>>, "00000000000000000000"},
+            {<<123::64>>, "00000000000000000123"},
+            {<<@signed_max::64>>, "09223372036854775807"},
+            {<<@signed_max + 1::64>>, "-09223372036854775808"},
+            {<<@unsigned_max::64>>, "-00000000000000000001"}
+          ] do
+        params = Once.init(prefix: "t_", persist_prefix: true, ex_format: ex_format)
+        id = Once.to_format!(raw, ex_format) |> Once.Prefix.put("t_")
+        stored = "t_" <> signed
+
+        assert Once.type(params) == :string
+        assert {:ok, ^stored} = Once.dump(id, nil, params)
+        assert {:ok, ^id} = Once.load(stored, nil, params)
+      end
+    end
+
+    test "stores unsigned integers as prefixed decimal strings" do
+      for ex_format <- [:url64, :hex, :signed, :unsigned],
+          {raw, unsigned} <- [
+            {<<0::64>>, "00000000000000000000"},
+            {<<12_345_678::64>>, "00000000000012345678"},
+            {<<@signed_max::64>>, "09223372036854775807"},
+            {<<@signed_max + 1::64>>, "09223372036854775808"},
+            {<<@unsigned_max::64>>, "18446744073709551615"}
+          ] do
+        params =
+          Once.init(
+            prefix: "t_",
+            persist_prefix: true,
+            db_format: :unsigned,
+            ex_format: ex_format
+          )
+
+        id = Once.to_format!(raw, ex_format) |> Once.Prefix.put("t_")
+        stored = "t_" <> unsigned
+
+        assert Once.type(params) == :string
+        assert {:ok, ^stored} = Once.dump(id, nil, params)
+        assert {:ok, ^id} = Once.load(stored, nil, params)
+      end
+
+      for db_format <- @int_formats do
+        assert Once.type(Once.init(prefix: "t_", db_format: db_format)) == :integer
+      end
+    end
+
+    test "pads persisted integers correctly at digit boundaries" do
+      thresholds = [10_000_000_000_000_000, 100_000_000_000_000_000, 1_000_000_000_000_000_000]
+
+      for format <- [:signed, :unsigned],
+          threshold <- thresholds,
+          magnitude <- [threshold - 1, threshold, threshold + 1],
+          value <- if(format == :signed, do: [magnitude, -magnitude], else: [magnitude]) do
+        params =
+          Once.init(prefix: "t_", persist_prefix: true, ex_format: format, db_format: format)
+
+        digits = value |> abs() |> Integer.to_string() |> String.pad_leading(20, "0")
+        expected = "t_" <> if(value < 0, do: "-" <> digits, else: digits)
+
+        assert {:ok, ^expected} = Once.dump("t_#{value}", nil, params)
+      end
+
+      params =
+        Once.init(prefix: "t_", persist_prefix: true, ex_format: :unsigned, db_format: :unsigned)
+
+      for value <- [
+            9_999_999_999_999_999_999,
+            10_000_000_000_000_000_000,
+            10_000_000_000_000_000_001
+          ] do
+        expected = "t_" <> (value |> Integer.to_string() |> String.pad_leading(20, "0"))
+        assert {:ok, ^expected} = Once.dump("t_#{value}", nil, params)
+      end
+    end
+
+    test "rejects invalid persisted integer values" do
+      for format <- @int_formats do
+        params = Once.init(prefix: "t_", persist_prefix: true, db_format: format)
+
+        for value <- [
+              "wrong_123",
+              "123",
+              "t_",
+              "t_12x",
+              "t_#{@bigint_size}",
+              "t_#{@signed_min - 1}",
+              123
+            ] do
+          assert :error = Once.load(value, nil, params)
+        end
+
+        assert {:ok, negative} = Once.load("t_-1", nil, params)
+        assert {:ok, ^negative} = Once.load("t_#{@unsigned_max}", nil, params)
+        assert {:ok, zero} = Once.load("t_-0", nil, params)
+        assert {:ok, ^zero} = Once.load("t_0", nil, params)
+      end
+    end
+
     test "dump preserves prefix when persist_prefix is true" do
       params = %{@base_opts | persist_prefix: true, db_format: :url64}
       id = Once.autogenerate(params)

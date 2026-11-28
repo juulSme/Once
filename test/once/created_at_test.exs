@@ -31,6 +31,34 @@ defmodule Once.CreatedAtTest do
     assert :error = Once.CreatedAt.load("wrong_0000000002800001", nil, params)
   end
 
+  test "loads timestamps from persisted prefixed integer formats" do
+    raw = <<10::42, 3::9, 7::13>>
+    expected = DateTime.add(@epoch, 10, :millisecond)
+
+    for masked <- [false, true], format <- [:signed, :unsigned] do
+      params =
+        Once.CreatedAt.init(
+          epoch: @epoch,
+          nonce_type: :sortable,
+          db_format: format,
+          prefix: "id_",
+          persist_prefix: true,
+          mask: masked
+        )
+
+      stored = "id_#{Once.to_format!(raw, format)}"
+      assert Once.CreatedAt.type(params) == :string
+      assert {:ok, ^expected} = Once.CreatedAt.load(stored, nil, params)
+
+      for invalid <- ["wrong_123", "123", "id_invalid", "id_18446744073709551616", 123] do
+        assert :error = Once.CreatedAt.load(invalid, nil, params)
+      end
+
+      assert {:ok, negative} = Once.CreatedAt.load("id_-1", nil, params)
+      assert {:ok, ^negative} = Once.CreatedAt.load("id_18446744073709551615", nil, params)
+    end
+  end
+
   test "validates configuration and rejects writes and invalid stored IDs" do
     params = Once.CreatedAt.init(epoch: @epoch, nonce_type: :sortable)
 
@@ -103,6 +131,19 @@ defmodule Once.CreatedAtTest do
 
       assert {:ok, "id_0000000002800000"} = Once.CreatedAt.dump(boundary, nil, params)
     end
+
+    for masked <- [false, true] do
+      params =
+        Once.CreatedAt.init(
+          nonce_type: :sortable,
+          db_format: :unsigned,
+          mask: masked,
+          prefix: "id_",
+          persist_prefix: true
+        )
+
+      assert {:ok, "id_00000000000041943040"} = Once.CreatedAt.dump(boundary, nil, params)
+    end
   end
 end
 
@@ -154,6 +195,22 @@ defmodule Once.CreatedAtDbTest.Schema do
       persist_prefix: true,
       writable: :never,
       on_writable_violation: :raise
+
+    field :prefixed_unsigned_id, Once,
+      nonce_type: :sortable,
+      db_format: :unsigned,
+      prefix: "id_",
+      persist_prefix: true
+
+    field :prefixed_unsigned_created_at, Once.CreatedAt,
+      source: :prefixed_unsigned_id,
+      epoch: @epoch,
+      nonce_type: :sortable,
+      db_format: :unsigned,
+      prefix: "id_",
+      persist_prefix: true,
+      writable: :never,
+      on_writable_violation: :raise
   end
 end
 
@@ -198,6 +255,47 @@ defmodule Once.CreatedAtDbTest do
     list
     |> Enum.with_index()
     |> Enum.flat_map(fn {v, i} -> if i in indices, do: [v], else: [] end)
+  end
+
+  test "padded persisted integers order and query across decimal width changes" do
+    boundary = ~U[2025-01-01 00:00:00.003Z]
+
+    for repo <- [MyApp.PgRepo, MyApp.MysqlRepo] do
+      repo.insert_all("test_table", [
+        %{
+          bigint_id: 8_388_608,
+          prefixed_unsigned_id: "id_00000000000008388608"
+        },
+        %{
+          bigint_id: 12_582_912,
+          prefixed_unsigned_id: "id_00000000000012582912"
+        }
+      ])
+
+      for field <- [
+            :prefixed_unsigned_id,
+            :prefixed_unsigned_created_at
+          ] do
+        earlier =
+          from row in Schema,
+            where: earlier_than(field(row, ^field), ^boundary),
+            select: row.bigint_id
+
+        later =
+          from row in Schema,
+            where: later_or_at(field(row, ^field), ^boundary),
+            select: row.bigint_id
+
+        matching =
+          from row in Schema,
+            where: at(field(row, ^field), ^boundary),
+            select: row.bigint_id
+
+        assert repo.all(earlier) |> Enum.map(&Once.to_format!(&1, :unsigned)) == [8_388_608]
+        assert repo.all(later) |> Enum.map(&Once.to_format!(&1, :unsigned)) == [12_582_912]
+        assert repo.all(matching) |> Enum.map(&Once.to_format!(&1, :unsigned)) == [12_582_912]
+      end
+    end
   end
 
   test "query macros filter derived timestamps across database formats" do

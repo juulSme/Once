@@ -18,7 +18,7 @@ defmodule Once do
   - `:nonce_type` how the nonce is generated, one of `t:nonce_type/0` (default `:counter`)
   - `:mask` use encrypted IDs in Elixir; encrypt on load, decrypt on dump (default `false`)
   - `:prefix` a string prefix to prepend to IDs, for example `"usr_"` or `"prod_"` (default `nil`)
-  - `:persist_prefix` whether to store the prefix in the database; requires a binary `:db_format` (default `false`)
+  - `:persist_prefix` whether to store the prefix in the database (default `false`)
   """
 
   @moduledoc """
@@ -87,7 +87,7 @@ defmodule Once do
 
   The prefixes can optionally be persisted to the database. This is controlled by option `:persist_prefix`, the default is `false`. If the prefix is not persisted, it only exists in Elixir and is stripped before storing an ID in the database, and re-added on load. This allows us to still use 64-bit integer columns. So in Elixir you could have `"usr_AV7m9gAAAAU"` while in the database you would have `98770186085072901`.
 
-  With `persist_prefix: true`, the full prefixed string is stored. This sacrifices storage efficiency for database-level readability. Your ID would look like `"usr_AV7m9gAAAAU"` in both Elixir and your database. You can only use `db_format: :url64`, `:hex`, `:hex32` or `:raw` with `persist_prefix: true`.
+  With `persist_prefix: true`, the full prefixed value is stored. This sacrifices storage efficiency for database-level readability. Integer formats require a string column and store zero-padded decimal values.
 
   Use `to_format/3` with the `:prefix` option to convert between formats while preserving the prefix.
 
@@ -219,7 +219,7 @@ defmodule Once do
       end
   """
   use Ecto.ParameterizedType
-  alias Once.{Parse, Constants, Init, Prefix, Mask}
+  alias Once.{Parse, Constants, Init, Prefix, Mask, Pad}
   use Constants
   import Prefix, only: [map_prefixed: 4]
 
@@ -262,6 +262,7 @@ defmodule Once do
   #######################
 
   @impl true
+  def type(%{persist_prefix: true, db_format: format}) when format in @int_formats, do: :string
   def type(%{db_format: :raw}), do: :binary
   def type(%{db_format: format}) when format in @encoded_formats, do: :string
   def type(%{db_format: format}) when format in @int_formats, do: :integer
@@ -283,16 +284,21 @@ defmodule Once do
 
   @impl true
   def load(nil, _, _), do: {:ok, nil}
+  def load(value, _, %{persist_prefix: true}) when not is_binary(value), do: :error
 
   def load(value, _, params = %{prefix: prefix, ex_format: ex_fmt}) do
     to_strip = Prefix.if_persistent(prefix, params)
 
-    if params.mask do
-      map_prefixed value, to_strip, prefix do
-        Mask.to_masked_format(stripped, params.no_noncense, ex_fmt, false)
+    map_prefixed value, to_strip, prefix do
+      parse_num? = params.persist_prefix and params.db_format in @int_formats
+
+      with {:ok, input} <- Parse.maybe_parse_num_str(stripped, parse_num?) do
+        if params.mask do
+          Mask.to_masked_format(input, params.no_noncense, ex_fmt, false)
+        else
+          convert(input, ex_fmt, ex_fmt in @int_formats)
+        end
       end
-    else
-      do_to_format(value, ex_fmt, to_strip, prefix, ex_fmt in @int_formats)
     end
   end
 
@@ -302,14 +308,24 @@ defmodule Once do
   def dump(value, _, params = %{prefix: prefix, ex_format: ex_fmt, db_format: db_fmt}) do
     to_put = Prefix.if_persistent(prefix, params)
 
-    if params.mask do
-      map_prefixed value, prefix, to_put do
+    map_prefixed value, prefix, to_put do
+      if params.mask do
         Mask.to_unmasked_format(stripped, params.no_noncense, db_fmt, ex_fmt in @int_formats)
+      else
+        convert(stripped, db_fmt, ex_fmt in @int_formats)
       end
-    else
-      do_to_format(value, db_fmt, prefix, to_put, ex_fmt in @int_formats)
+      |> pad_persisted_integer(params.persist_prefix, db_fmt)
     end
   end
+
+  defp pad_persisted_integer(conversion_result, persist_prefix?, db_format)
+  defp pad_persisted_integer(conversion_result, false, _), do: conversion_result
+
+  defp pad_persisted_integer({:ok, value}, _, db_format) when db_format in @int_formats do
+    {:ok, Pad.zero_lpad_int(value, 20)}
+  end
+
+  defp pad_persisted_integer(conversion_result, _, _), do: conversion_result
 
   @impl true
   def autogenerate(params) when params.mask do
@@ -433,10 +449,14 @@ defmodule Once do
 
   defp do_to_format(value, format, strip_prefix, put_prefix, parse_int?) do
     map_prefixed value, strip_prefix, put_prefix do
-      with {:ok, stripped_parsed} <- Parse.maybe_parse_num_str(stripped, parse_int?),
-           {:ok, format_in} <- Parse.identify_format(stripped_parsed) do
-        Parse.maybe_convert(stripped_parsed, format_in, format)
-      end
+      convert(stripped, format, parse_int?)
+    end
+  end
+
+  defp convert(value, format, parse_int?) do
+    with {:ok, parsed} <- Parse.maybe_parse_num_str(value, parse_int?),
+         {:ok, format_in} <- Parse.identify_format(parsed) do
+      Parse.maybe_convert(parsed, format_in, format)
     end
   end
 end

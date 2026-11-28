@@ -74,6 +74,43 @@ defmodule Once.PrefixedPgTest do
   end
 
   describe "string type with persist_prefix" do
+    test "persists and queries prefixed decimal integer IDs" do
+      for {field, value, stored} <- [
+            {:prefixed_unsigned_id, "t_123", "t_00000000000000000123"},
+            {:prefixed_unsigned_id, "t_#{@unsigned_max}", "t_#{@unsigned_max}"}
+          ] do
+        assert {:ok, _} = PrefixSchema.changeset(%{field => value}) |> PgRepo.insert()
+
+        assert ^stored =
+                 PgRepo.one(
+                   from r in "test_table",
+                     where: field(r, ^field) == ^stored,
+                     select: field(r, ^field)
+                 )
+
+        assert %{^field => ^value} = get(field, value) |> PgRepo.one()
+      end
+    end
+
+    test "persists and queries signed prefixed integer IDs" do
+      for {value, stored} <- [
+            {"t_123", "t_00000000000000000123"},
+            {"t_-1", "t_-00000000000000000001"},
+            {"t_#{@signed_min}", "t_-09223372036854775808"}
+          ] do
+        assert {:ok, _} = PrefixSchema.changeset(%{prefixed_signed_id: value}) |> PgRepo.insert()
+
+        assert ^stored =
+                 PgRepo.one(
+                   from r in "test_table",
+                     where: r.prefixed_signed_id == ^stored,
+                     select: r.prefixed_signed_id
+                 )
+
+        assert %{prefixed_signed_id: ^value} = get(:prefixed_signed_id, value) |> PgRepo.one()
+      end
+    end
+
     test "correctly returns input and persists prefix" do
       for {input, expected, expected_raw} <- [
             {"t_AAAAAAAAAAA", "t_AAAAAAAAAAA", "t_AAAAAAAAAAA"},

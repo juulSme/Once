@@ -90,9 +90,13 @@ defmodule Once.CreatedAt do
 
   @impl true
   def load(nil, _, _), do: {:ok, nil}
+  def load(value, _, %{persist_prefix: true}) when not is_binary(value), do: :error
 
   def load(value, _, params) do
+    parse_num? = params.persist_prefix and params.db_format in @int_formats
+
     with {:ok, value} <- Prefix.strip(value, Prefix.if_persistent(params.prefix, params)),
+         {:ok, value} <- Parse.maybe_parse_num_str(value, parse_num?),
          {:ok, raw_nonce} <- to_raw(value, params.db_format) do
       {:ok, NoNoncense.created_at(raw_nonce, params.epoch)}
     else

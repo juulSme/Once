@@ -213,6 +213,40 @@ defmodule Once.MaskedPrefixedUnitTest do
   end
 
   describe "persist_prefix with mask" do
+    test "round-trips persisted integer formats as plaintext decimal strings" do
+      for ex_format <- [:url64, :signed, :unsigned], db_format <- [:signed, :unsigned] do
+        params =
+          Once.init(
+            prefix: "t_",
+            mask: true,
+            persist_prefix: true,
+            db_format: db_format,
+            ex_format: ex_format
+          )
+
+        id = Once.autogenerate(params)
+
+        assert {:ok, "t_" <> decimal = stored} = Once.dump(id, nil, params)
+        assert {_, ""} = Integer.parse(decimal)
+
+        assert byte_size(String.trim_leading(decimal, "-")) == 20
+
+        assert {:ok, ^id} = Once.load(stored, nil, params)
+        assert :error = Once.load("t_not-a-number", nil, params)
+        assert {:ok, negative} = Once.load("t_-1", nil, params)
+        assert {:ok, ^negative} = Once.load("t_#{@unsigned_max}", nil, params)
+      end
+    end
+
+    test "round-trips negative signed plaintext with a persisted prefix" do
+      params = Once.init(prefix: "t_", mask: true, persist_prefix: true)
+      masked = NoNoncense.encrypt(Once, <<@unsigned_max::64>>)
+      id = masked |> Once.to_format!(:url64) |> Once.Prefix.put("t_")
+
+      assert {:ok, "t_-00000000000000000001" = stored} = Once.dump(id, nil, params)
+      assert {:ok, ^id} = Once.load(stored, nil, params)
+    end
+
     test "dump preserves prefix but decrypts value" do
       params = %{@base_opts | persist_prefix: true, db_format: :url64, ex_format: :url64}
       generated = Once.autogenerate(params)
